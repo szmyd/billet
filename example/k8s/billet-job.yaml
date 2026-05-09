@@ -1,0 +1,107 @@
+# A billet test run as a Kubernetes Job. The pod binds a block-mode
+# PVC at /dev/billet-target, runs the scripted profile series via the
+# image's entrypoint (example/k8s/entrypoint.sh baked in at build
+# time), and lands an output archive in its emptyDir for kubectl cp.
+#
+# Per-scenario adjustments to copy + edit:
+#   metadata.name                                        -- per-scenario unique (e.g. billet-md-raid0)
+#   spec.template.metadata.labels.scenario
+#   spec.template.spec.volumes[target].persistentVolumeClaim.claimName
+#   env.DEVICE_LABEL                                     -- legend / entity prefix
+#   env.TARGET_PVC                                       -- same PVC name as above, recorded for audit
+#   spec.template.spec.containers[0].image               -- your registry tag
+#
+# Prometheus annotation form below assumes annotation-based scrape
+# (vanilla prom or kube-prometheus-stack with annotation discovery).
+# For Elastic Metricbeat or prometheus-operator, see example/k8s/README.md.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: billet-baseline
+  labels:
+    app: billet
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400      # 24 h to collect, then GC
+  template:
+    metadata:
+      labels:
+        app: billet
+        scenario: baseline
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9777"
+        prometheus.io/path: "/metrics"
+        # Alternate: Elastic Metricbeat / autodiscover (uncomment if
+        # the cluster uses Beats-style scraping instead of prometheus
+        # annotations):
+        # co.elastic.metrics/module: prometheus
+        # co.elastic.metrics/hosts: '${data.host}:9777'
+        # co.elastic.metrics/metrics_path: /metrics
+        # co.elastic.metrics/period: 10s
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: billet
+        image: your-registry.example.com/billet:latest
+        imagePullPolicy: IfNotPresent
+        # ENTRYPOINT is /usr/local/bin/billet-runner.sh (baked from
+        # example/k8s/entrypoint.sh by the image build).
+        env:
+        - name: DEVICE_PATH
+          value: /dev/billet-target
+        - name: DEVICE_LABEL
+          value: baseline
+        - name: TARGET_PVC
+          value: billet-baseline-pvc
+        - name: DURATION_S
+          value: "120"
+        - name: QD
+          value: "32"
+        - name: METRICS_PORT
+          value: "9777"
+        - name: METRICS_DRAIN_S
+          value: "30"
+        - name: OUTPUT_DIR
+          value: /output
+        - name: JOB_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['job-name']
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        ports:
+        - name: metrics
+          containerPort: 9777
+        resources:
+          requests:
+            cpu: "2"
+            memory: "1Gi"
+          limits:
+            cpu: "2"
+            memory: "2Gi"
+        # Block-mode PVC: the target shows up as a raw device, not a
+        # mounted filesystem. Filesystem-mode PVCs will not work --
+        # they put ext4/xfs in the I/O path and break O_DIRECT.
+        volumeDevices:
+        - name: target
+          devicePath: /dev/billet-target
+        volumeMounts:
+        - name: output
+          mountPath: /output
+      volumes:
+      - name: target
+        persistentVolumeClaim:
+          claimName: billet-baseline-pvc
+      - name: output
+        emptyDir: {}

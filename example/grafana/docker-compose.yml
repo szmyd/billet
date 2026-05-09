@@ -1,0 +1,47 @@
+# Live observability stack for a running billet process.
+#
+# Brings up Prometheus (scraping billet's /metrics) and Grafana (with the
+# billet dashboard auto-provisioned). billet itself runs on the host; the
+# Prometheus container reaches it via the host-gateway extra_host alias.
+#
+# Usage:
+#   docker compose up -d
+#   sudo build/Release/src/cli/billet --device /dev/loop0 --duration 600 \
+#       --metrics-port 9777 --profile postgresql --allow-destructive
+#   open http://localhost:3030  (admin / admin)
+# Host ports are 3030 (Grafana) and 9091 (Prometheus) to dodge the common
+# 3000 / 9090 collisions; container-internal ports are unchanged.
+
+services:
+  prometheus:
+    image: docker.io/prom/prometheus:v3.0.1
+    container_name: billet-prometheus
+    ports:
+      # Host:container. Container stays 9090 so Grafana's datasource URL
+      # (http://prometheus:9090) still works over the docker network.
+      - "9091:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=24h"
+      - "--web.enable-lifecycle"
+
+  grafana:
+    image: docker.io/grafana/grafana:11.4.0
+    container_name: billet-grafana
+    ports:
+      - "3030:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+    depends_on:
+      - prometheus
