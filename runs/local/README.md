@@ -2,7 +2,7 @@
   <img src="../../docs/assets/billet-logo.png" alt="billet logo" width="160">
 </p>
 
-# billet: ublkpp md vs kernel md vs raw NVMe
+# billet: ublkpp raid vs kernel md vs raw NVMe
 
 A side-by-side under a PostgreSQL-shaped block workload.
 
@@ -14,7 +14,7 @@ A side-by-side under a PostgreSQL-shaped block workload.
 >    read tail under mixed load: `reader.Read` p99 of **5.2 seconds** versus
 >    9.8 ms on `nvme0n1`. Every RAID1 result inherits this, so the mirror
 >    rows in this matrix mostly measure a sick drive, not the driver.
-> 2. The clean comparison is RAID0. **ublkpp md-raid0 matches kernel
+> 2. The clean comparison is RAID0. **ublkpp raid0 matches kernel
 >    md-raid0** in shape: same IOPS, ~35% higher read p99 (1.5 ms vs 1.1 ms),
 >    and a meaningful win on commit cost (`wal.Fsync` p99 ~800 us vs ~2 ms).
 >    Both stripes beat the lone-drive baseline on read p99 by 6 to 10x.
@@ -89,10 +89,10 @@ Host: AMD EPYC 4464P 12-core, 24 threads, 62 GiB RAM, kernel 6.18.22 (CachyOS LT
 | `baseline-alt` | /dev/nvme1n1 | Raw NVMe | Same model, much worse tail (see analysis) |
 | `md-raid0` | /dev/md0 | Kernel md, stripe across nvme0+nvme1 | 64 KiB chunk |
 | `md-raid1` | /dev/md1 | Kernel md, mirror across nvme0+nvme1 | `--assume-clean` |
-| `ublk-raid0-hw1` | /dev/ublkb0 | ublkpp md-raid0, 1 hardware queue | |
-| `ublk-raid0-hw4` | /dev/ublkb0 | ublkpp md-raid0, 4 hardware queues | |
-| `ublk-raid1-hw1` | /dev/ublkb0 | ublkpp md-raid1, 1 hardware queue | |
-| `ublk-raid1-hw4` | /dev/ublkb0 | ublkpp md-raid1, 4 hardware queues | |
+| `ublk-raid0-hw1` | /dev/ublkb0 | ublkpp raid0, 1 hardware queue | |
+| `ublk-raid0-hw4` | /dev/ublkb0 | ublkpp raid0, 4 hardware queues | |
+| `ublk-raid1-hw1` | /dev/ublkb0 | ublkpp raid1, 1 hardware queue | |
+| `ublk-raid1-hw4` | /dev/ublkb0 | ublkpp raid1, 4 hardware queues | |
 
 ## Visualizations
 
@@ -210,7 +210,7 @@ nvme1n1's pathology.
 
 Three takeaways:
 
-- **ublkpp md-raid0 produces the same shape as kernel md-raid0** across
+- **ublkpp raid0 produces the same shape as kernel md-raid0** across
   every component cell, with single-digit-percent to ~35% overhead on
   reads, writes, WAL appends, and checkpoint bursts.
 - **ublkpp wins on commit cost.** `wal.Fsync` p99 is roughly half of the
@@ -252,7 +252,7 @@ What **is** suggestive (and worth investigating on clean hardware):
 
 For PostgreSQL-shaped block pressure on this host:
 
-- **ublkpp md-raid0 is a credible substitute for kernel md-raid0.** Same
+- **ublkpp raid0 is a credible substitute for kernel md-raid0.** Same
   IOPS and throughput; latency overhead in the 0-35% range across most
   cells; a clear win on `wal.Fsync` p99 (-50%); insensitive to
   hardware-queue count at this rate.
@@ -281,7 +281,7 @@ sudo $BILLET --device /dev/ublkb0  --device-label ublk-raid0-hw1 "${PG_ARGS[@]}"
 # ... repeat for the other ublk configurations
 
 tools/compare.py runs/local/pg-*.json -o runs/local/pg-compare.html \
-    --title "ublkpp md vs kernel md vs raw NVMe"
+    --title "ublkpp vs kernel md vs raw NVMe"
 ```
 
 ## Artefacts in this directory
