@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 680" role="img" aria-label="Per-component p99 across all eight scenarios">
+  <style>
+    .axis-tick { font: 10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; fill: #6b7280; }
+    .axis-label { font: 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; fill: #6b7280; }
+    .panel-title { font: 600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; fill: #18181b; }
+    .chart-title { font: 600 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; fill: #18181b; }
+    .legend-text { font: 10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; fill: #18181b; }
+    .grid-line { stroke: #e5e7eb; stroke-width: 1; stroke-dasharray: 2,3; }
+  </style>
+
+  <text x="440" y="22" class="chart-title" text-anchor="middle">Per-component p99 across all eight scenarios (log us)</text>
+
+  <!-- Legend row -->
+  <g transform="translate(20,42)">
+    <rect x="0"   y="0" width="10" height="10" fill="#2563eb"/><text x="14" y="9" class="legend-text">baseline</text>
+    <rect x="105" y="0" width="10" height="10" fill="#dc2626"/><text x="119" y="9" class="legend-text">baseline-alt</text>
+    <rect x="210" y="0" width="10" height="10" fill="#475569"/><text x="224" y="9" class="legend-text">md-raid0</text>
+    <rect x="315" y="0" width="10" height="10" fill="#94a3b8"/><text x="329" y="9" class="legend-text">md-raid1</text>
+    <rect x="420" y="0" width="10" height="10" fill="#16a34a"/><text x="434" y="9" class="legend-text">ublk-r0-hw1</text>
+    <rect x="525" y="0" width="10" height="10" fill="#65a30d"/><text x="539" y="9" class="legend-text">ublk-r0-hw4</text>
+    <rect x="630" y="0" width="10" height="10" fill="#d97706"/><text x="644" y="9" class="legend-text">ublk-r1-hw1</text>
+    <rect x="735" y="0" width="10" height="10" fill="#ca8a04"/><text x="749" y="9" class="legend-text">ublk-r1-hw4</text>
+  </g>
+
+  <!-- Panel 1: rand_writer.Write -->
+  <g transform="translate(0,70)">
+    <text x="210" y="20" class="panel-title" text-anchor="middle">rand_writer.Write p99</text>
+    <line x1="60" y1="220" x2="380" y2="220" stroke="#9ca3af" stroke-width="1"/>
+    <line x1="60" y1="30"  x2="60"  y2="220" stroke="#9ca3af" stroke-width="1"/>
+    <text x="55" y="224" class="axis-tick" text-anchor="end">100u</text>
+    <text x="55" y="177" class="axis-tick" text-anchor="end">1m</text>
+    <text x="55" y="129" class="axis-tick" text-anchor="end">10m</text>
+    <text x="55" y="82"  class="axis-tick" text-anchor="end">100m</text>
+    <text x="55" y="34"  class="axis-tick" text-anchor="end">1s</text>
+    <line x1="60" y1="173" x2="380" y2="173" class="grid-line"/>
+    <line x1="60" y1="125" x2="380" y2="125" class="grid-line"/>
+    <line x1="60" y1="78"  x2="380" y2="78"  class="grid-line"/>
+    <line x1="60" y1="30"  x2="380" y2="30"  class="grid-line"/>
+    <rect x="61"  y="189" width="32" height="31"  fill="#2563eb"/>
+    <rect x="101" y="42"  width="32" height="178" fill="#dc2626"/>
+    <rect x="141" y="173" width="32" height="47"  fill="#475569"/>
+    <rect x="181" y="38"  width="32" height="182" fill="#94a3b8"/>
+    <rect x="221" y="173" width="32" height="47"  fill="#16a34a"/>
+    <rect x="261" y="169" width="32" height="51"  fill="#65a30d"/>
+    <rect x="301" y="50"  width="32" height="170" fill="#d97706"/>
+    <rect x="341" y="38"  width="32" height="182" fill="#ca8a04"/>
+  </g>
+
+  <!-- Panel 2: wal.Write -->
+  <g transform="translate(440,70)">
+    <text x="210" y="20" class="panel-title" text-anchor="middle">wal.Write p99</text>
+    <line x1="60" y1="220" x2="380" y2="220" stroke="#9ca3af" stroke-width="1"/>
+    <line x1="60" y1="30"  x2="60"  y2="220" stroke="#9ca3af" stroke-width="1"/>
+    <text x="55" y="224" class="axis-tick" text-anchor="end">100u</text>
+    <text x="55" y="177" class="axis-tick" text-anchor="end">1m</text>
+    <text x="55" y="129" class="axis-tick" text-anchor="end">10m</text>
+    <text x="55" y="82"  class="axis-tick" text-anchor="end">100m</text>
+    <text x="55" y="34"  class="axis-tick" text-anchor="end">1s</text>
+    <line x1="60" y1="173" x2="380" y2="173" class="grid-line"/>
+    <line x1="60" y1="125" x2="380" y2="125" class="grid-line"/>
+    <line x1="60" y1="78"  x2="380" y2="78"  class="grid-line"/>
+    <line x1="60" y1="30"  x2="380" y2="30"  class="grid-line"/>
+    <rect x="61"  y="190" width="32" height="30"  fill="#2563eb"/>
+    <rect x="101" y="97"  width="32" height="123" fill="#dc2626"/>
+    <rect x="141" y="179" width="32" height="41"  fill="#475569"/>
+    <rect x="181" y="109" width="32" height="111" fill="#94a3b8"/>
+    <rect x="221" y="179" width="32" height="41"  fill="#16a34a"/>
+    <rect x="261" y="173" width="32" height="47"  fill="#65a30d"/>
+    <rect x="301" y="134" width="32" height="86"  fill="#d97706"/>
+    <rect x="341" y="110" width="32" height="110" fill="#ca8a04"/>
+  </g>
+
+  <!-- Panel 3: wal.Fsync -->
+  <g transform="translate(0,370)">
+    <text x="210" y="20" class="panel-title" text-anchor="middle">wal.Fsync p99</text>
+    <line x1="60" y1="220" x2="380" y2="220" stroke="#9ca3af" stroke-width="1"/>
+    <line x1="60" y1="30"  x2="60"  y2="220" stroke="#9ca3af" stroke-width="1"/>
+    <text x="55" y="224" class="axis-tick" text-anchor="end">100u</text>
+    <text x="55" y="177" class="axis-tick" text-anchor="end">1m</text>
+    <text x="55" y="129" class="axis-tick" text-anchor="end">10m</text>
+    <text x="55" y="82"  class="axis-tick" text-anchor="end">100m</text>
+    <text x="55" y="34"  class="axis-tick" text-anchor="end">1s</text>
+    <line x1="60" y1="173" x2="380" y2="173" class="grid-line"/>
+    <line x1="60" y1="125" x2="380" y2="125" class="grid-line"/>
+    <line x1="60" y1="78"  x2="380" y2="78"  class="grid-line"/>
+    <line x1="60" y1="30"  x2="380" y2="30"  class="grid-line"/>
+    <rect x="61"  y="169" width="32" height="51"  fill="#2563eb"/>
+    <rect x="101" y="89"  width="32" height="131" fill="#dc2626"/>
+    <rect x="141" y="158" width="32" height="62"  fill="#475569"/>
+    <rect x="181" y="113" width="32" height="107" fill="#94a3b8"/>
+    <rect x="221" y="172" width="32" height="48"  fill="#16a34a"/>
+    <rect x="261" y="177" width="32" height="43"  fill="#65a30d"/>
+    <rect x="301" y="132" width="32" height="88"  fill="#d97706"/>
+    <rect x="341" y="111" width="32" height="109" fill="#ca8a04"/>
+  </g>
+
+  <!-- Panel 4: ckpt.Write -->
+  <g transform="translate(440,370)">
+    <text x="210" y="20" class="panel-title" text-anchor="middle">ckpt.Write p99</text>
+    <line x1="60" y1="220" x2="380" y2="220" stroke="#9ca3af" stroke-width="1"/>
+    <line x1="60" y1="30"  x2="60"  y2="220" stroke="#9ca3af" stroke-width="1"/>
+    <text x="55" y="224" class="axis-tick" text-anchor="end">100u</text>
+    <text x="55" y="177" class="axis-tick" text-anchor="end">1m</text>
+    <text x="55" y="129" class="axis-tick" text-anchor="end">10m</text>
+    <text x="55" y="82"  class="axis-tick" text-anchor="end">100m</text>
+    <text x="55" y="34"  class="axis-tick" text-anchor="end">1s</text>
+    <line x1="60" y1="173" x2="380" y2="173" class="grid-line"/>
+    <line x1="60" y1="125" x2="380" y2="125" class="grid-line"/>
+    <line x1="60" y1="78"  x2="380" y2="78"  class="grid-line"/>
+    <line x1="60" y1="30"  x2="380" y2="30"  class="grid-line"/>
+    <rect x="61"  y="149" width="32" height="71"  fill="#2563eb"/>
+    <rect x="101" y="108" width="32" height="112" fill="#dc2626"/>
+    <rect x="141" y="136" width="32" height="84"  fill="#475569"/>
+    <rect x="181" y="122" width="32" height="98"  fill="#94a3b8"/>
+    <rect x="221" y="137" width="32" height="83"  fill="#16a34a"/>
+    <rect x="261" y="135" width="32" height="85"  fill="#65a30d"/>
+    <rect x="301" y="128" width="32" height="92"  fill="#d97706"/>
+    <rect x="341" y="110" width="32" height="110" fill="#ca8a04"/>
+  </g>
+</svg>

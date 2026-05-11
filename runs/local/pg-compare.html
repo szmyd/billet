@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ublkpp raid vs md-raid vs raw NVMe @ qd=32, 120s</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 24px;
+          background: #f8fafc; color: #0f172a; }
+  h1 { margin: 0 0 8px 0; }
+  h2 { margin: 28px 0 12px 0; font-size: 18px; color: #334155;
+        border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+  .meta { color: #64748b; font-size: 13px; margin: 0 0 24px 0; }
+  .panel { background: white; padding: 14px 22px; margin-bottom: 18px;
+            border: 1px solid #e2e8f0; border-radius: 8px;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); }
+  table { font-family: ui-monospace, monospace; font-size: 13px;
+           border-collapse: collapse; }
+  th, td { padding: 4px 12px; text-align: left;
+            border-bottom: 1px solid #e2e8f0; }
+  th { font-weight: 600; color: #64748b; }
+  details { margin-top: 24px; }
+  summary { cursor: pointer; color: #475569; font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>ublkpp raid vs md-raid vs raw NVMe @ qd=32, 120s</h1>
+<p class="meta">8 runs &middot; right-click any chart to save the SVG</p>
+<h2>Headlines</h2>
+<div class="panel"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 392" width="880" height="392" font-family="system-ui, sans-serif" font-size="14">
+<text x="240" y="24" font-weight="600" font-size="17">Aggregate IOPS</text>
+<text x="240" y="44" fill="#64748b" font-size="12">ops/s &middot; higher is better</text>
+<text x="230" y="80.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">baseline-alt</text>
+<rect x="240" y="60" width="493.6" height="30" fill="#2563eb" />
+<text x="741.6" y="80.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">15,613</text>
+<text x="230" y="118.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">baseline</text>
+<rect x="240" y="98" width="504.3" height="30" fill="#16a34a" />
+<text x="752.3" y="118.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">15,953</text>
+<text x="230" y="156.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">md-raid0</text>
+<rect x="240" y="136" width="502.7" height="30" fill="#d97706" />
+<text x="750.7" y="156.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">15,901</text>
+<text x="230" y="194.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">md-raid1</text>
+<rect x="240" y="174" width="510.0" height="30" fill="#dc2626" />
+<text x="758.0" y="194.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">16,133</text>
+<text x="230" y="232.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid0-hw1</text>
+<rect x="240" y="212" width="502.1" height="30" fill="#7c3aed" />
+<text x="750.1" y="232.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">15,884</text>
+<text x="230" y="270.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid0-hw4</text>
+<rect x="240" y="250" width="501.9" height="30" fill="#0891b2" />
+<text x="749.9" y="270.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">15,875</text>
+<text x="230" y="308.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid1-hw1</text>
+<rect x="240" y="288" width="498.3" height="30" fill="#db2777" />
+<text x="746.3" y="308.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">15,762</text>
+<text x="230" y="346.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid1-hw4</text>
+<rect x="240" y="326" width="508.9" height="30" fill="#ca8a04" />
+<text x="756.9" y="346.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">16,096</text>
+</svg></div>
+<div class="panel"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 392" width="880" height="392" font-family="system-ui, sans-serif" font-size="14">
+<text x="240" y="24" font-weight="600" font-size="17">Throughput</text>
+<text x="240" y="44" fill="#64748b" font-size="12">MiB/s &middot; higher is better</text>
+<text x="230" y="80.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">baseline-alt</text>
+<rect x="240" y="60" width="493.8" height="30" fill="#2563eb" />
+<text x="741.8" y="80.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">161.6</text>
+<text x="230" y="118.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">baseline</text>
+<rect x="240" y="98" width="510.0" height="30" fill="#16a34a" />
+<text x="758.0" y="118.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">166.9</text>
+<text x="230" y="156.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">md-raid0</text>
+<rect x="240" y="136" width="508.3" height="30" fill="#d97706" />
+<text x="756.3" y="156.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">166.4</text>
+<text x="230" y="194.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">md-raid1</text>
+<rect x="240" y="174" width="508.1" height="30" fill="#dc2626" />
+<text x="756.1" y="194.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">166.3</text>
+<text x="230" y="232.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid0-hw1</text>
+<rect x="240" y="212" width="507.8" height="30" fill="#7c3aed" />
+<text x="755.8" y="232.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">166.2</text>
+<text x="230" y="270.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid0-hw4</text>
+<rect x="240" y="250" width="507.5" height="30" fill="#0891b2" />
+<text x="755.5" y="270.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">166.1</text>
+<text x="230" y="308.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid1-hw1</text>
+<rect x="240" y="288" width="498.6" height="30" fill="#db2777" />
+<text x="746.6" y="308.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">163.2</text>
+<text x="230" y="346.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid1-hw4</text>
+<rect x="240" y="326" width="508.1" height="30" fill="#ca8a04" />
+<text x="756.1" y="346.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">166.3</text>
+</svg></div>
+<div class="panel"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 392" width="880" height="392" font-family="system-ui, sans-serif" font-size="14">
+<text x="240" y="24" font-weight="600" font-size="17">reader.Read p99</text>
+<text x="240" y="44" fill="#64748b" font-size="12">ms &middot; lower is better (log scale)</text>
+<text x="230" y="80.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">baseline-alt</text>
+<rect x="240" y="60" width="510.0" height="30" fill="#2563eb" />
+<text x="758.0" y="80.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">5.18 s</text>
+<text x="230" y="118.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">baseline</text>
+<rect x="240" y="98" width="187.0" height="30" fill="#16a34a" />
+<text x="435.0" y="118.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">9.81 ms</text>
+<text x="230" y="156.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">md-raid0</text>
+<rect x="240" y="136" width="83.3" height="30" fill="#d97706" />
+<text x="331.3" y="156.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">1.09 ms</text>
+<text x="230" y="194.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">md-raid1</text>
+<rect x="240" y="174" width="419.0" height="30" fill="#dc2626" />
+<text x="667.0" y="194.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">893 ms</text>
+<text x="230" y="232.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid0-hw1</text>
+<rect x="240" y="212" width="95.9" height="30" fill="#7c3aed" />
+<text x="343.9" y="232.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">1.46 ms</text>
+<text x="230" y="270.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid0-hw4</text>
+<rect x="240" y="250" width="97.3" height="30" fill="#0891b2" />
+<text x="345.3" y="270.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">1.51 ms</text>
+<text x="230" y="308.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid1-hw1</text>
+<rect x="240" y="288" width="393.3" height="30" fill="#db2777" />
+<text x="641.3" y="308.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">543 ms</text>
+<text x="230" y="346.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid1-hw4</text>
+<rect x="240" y="326" width="505.8" height="30" fill="#ca8a04" />
+<text x="753.8" y="346.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">4.78 s</text>
+</svg></div>
+<div class="panel"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 392" width="880" height="392" font-family="system-ui, sans-serif" font-size="14">
+<text x="240" y="24" font-weight="600" font-size="17">rand_writer.Write p99</text>
+<text x="240" y="44" fill="#64748b" font-size="12">ms &middot; lower is better (log scale)</text>
+<text x="230" y="80.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">baseline-alt</text>
+<rect x="240" y="60" width="497.7" height="30" fill="#2563eb" />
+<text x="745.7" y="80.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">558 ms</text>
+<text x="230" y="118.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">baseline</text>
+<rect x="240" y="98" width="93.9" height="30" fill="#16a34a" />
+<text x="341.9" y="118.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">440 µs</text>
+<text x="230" y="156.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">md-raid0</text>
+<rect x="240" y="136" width="133.7" height="30" fill="#d97706" />
+<text x="381.7" y="156.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">979 µs</text>
+<text x="230" y="194.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">md-raid1</text>
+<rect x="240" y="174" width="510.0" height="30" fill="#dc2626" />
+<text x="758.0" y="194.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">689 ms</text>
+<text x="230" y="232.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid0-hw1</text>
+<rect x="240" y="212" width="133.9" height="30" fill="#7c3aed" />
+<text x="381.9" y="232.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">982 µs</text>
+<text x="230" y="270.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid0-hw4</text>
+<rect x="240" y="250" width="142.8" height="30" fill="#0891b2" />
+<text x="390.8" y="270.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">1.16 ms</text>
+<text x="230" y="308.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid1-hw1</text>
+<rect x="240" y="288" width="474.8" height="30" fill="#db2777" />
+<text x="722.8" y="308.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">377 ms</text>
+<text x="230" y="346.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid1-hw4</text>
+<rect x="240" y="326" width="507.6" height="30" fill="#ca8a04" />
+<text x="755.6" y="346.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">661 ms</text>
+</svg></div>
+<div class="panel"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 392" width="880" height="392" font-family="system-ui, sans-serif" font-size="14">
+<text x="240" y="24" font-weight="600" font-size="17">wal.Write p99</text>
+<text x="240" y="44" fill="#64748b" font-size="12">ms &middot; lower is better (log scale)</text>
+<text x="230" y="80.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">baseline-alt</text>
+<rect x="240" y="60" width="510.0" height="30" fill="#2563eb" />
+<text x="758.0" y="80.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">37.91 ms</text>
+<text x="230" y="118.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">baseline</text>
+<rect x="240" y="98" width="139.8" height="30" fill="#16a34a" />
+<text x="387.8" y="118.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">428 µs</text>
+<text x="230" y="156.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">md-raid0</text>
+<rect x="240" y="136" width="177.2" height="30" fill="#d97706" />
+<text x="425.2" y="156.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">716 µs</text>
+<text x="230" y="194.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">md-raid1</text>
+<rect x="240" y="174" width="461.8" height="30" fill="#dc2626" />
+<text x="709.8" y="194.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">21.73 ms</text>
+<text x="230" y="232.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid0-hw1</text>
+<rect x="240" y="212" width="178.8" height="30" fill="#7c3aed" />
+<text x="426.8" y="232.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">732 µs</text>
+<text x="230" y="270.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid0-hw4</text>
+<rect x="240" y="250" width="199.3" height="30" fill="#0891b2" />
+<text x="447.3" y="270.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">955 µs</text>
+<text x="230" y="308.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid1-hw1</text>
+<rect x="240" y="288" width="359.4" height="30" fill="#db2777" />
+<text x="607.4" y="308.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">6.61 ms</text>
+<text x="230" y="346.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid1-hw4</text>
+<rect x="240" y="326" width="459.7" height="30" fill="#ca8a04" />
+<text x="707.7" y="346.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">21.20 ms</text>
+</svg></div>
+<div class="panel"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 392" width="880" height="392" font-family="system-ui, sans-serif" font-size="14">
+<text x="240" y="24" font-weight="600" font-size="17">wal.Fsync p99</text>
+<text x="240" y="44" fill="#64748b" font-size="12">ms &middot; lower is better (log scale)</text>
+<text x="230" y="80.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">baseline-alt</text>
+<rect x="240" y="60" width="510.0" height="30" fill="#2563eb" />
+<text x="758.0" y="80.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">56.23 ms</text>
+<text x="230" y="118.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">baseline</text>
+<rect x="240" y="98" width="175.6" height="30" fill="#16a34a" />
+<text x="423.6" y="118.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">1.20 ms</text>
+<text x="230" y="156.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">md-raid0</text>
+<rect x="240" y="136" width="215.2" height="30" fill="#d97706" />
+<text x="463.2" y="156.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">1.97 ms</text>
+<text x="230" y="194.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">md-raid1</text>
+<rect x="240" y="174" width="405.2" height="30" fill="#dc2626" />
+<text x="653.2" y="194.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">17.51 ms</text>
+<text x="230" y="232.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid0-hw1</text>
+<rect x="240" y="212" width="161.8" height="30" fill="#7c3aed" />
+<text x="409.8" y="232.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">1.00 ms</text>
+<text x="230" y="270.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid0-hw4</text>
+<rect x="240" y="250" width="145.6" height="30" fill="#0891b2" />
+<text x="393.6" y="270.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">803 µs</text>
+<text x="230" y="308.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid1-hw1</text>
+<rect x="240" y="288" width="326.7" height="30" fill="#db2777" />
+<text x="574.7" y="308.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">7.24 ms</text>
+<text x="230" y="346.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid1-hw4</text>
+<rect x="240" y="326" width="414.2" height="30" fill="#ca8a04" />
+<text x="662.2" y="346.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">19.36 ms</text>
+</svg></div>
+<div class="panel"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 392" width="880" height="392" font-family="system-ui, sans-serif" font-size="14">
+<text x="240" y="24" font-weight="600" font-size="17">ckpt.Write p99</text>
+<text x="240" y="44" fill="#64748b" font-size="12">ms &middot; lower is better (log scale)</text>
+<text x="230" y="80.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">baseline-alt</text>
+<rect x="240" y="60" width="510.0" height="30" fill="#2563eb" />
+<text x="758.0" y="80.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">22.33 ms</text>
+<text x="230" y="118.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">baseline</text>
+<rect x="240" y="98" width="241.2" height="30" fill="#16a34a" />
+<text x="489.2" y="118.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">3.07 ms</text>
+<text x="230" y="156.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">md-raid0</text>
+<rect x="240" y="136" width="325.3" height="30" fill="#d97706" />
+<text x="573.3" y="156.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">5.97 ms</text>
+<text x="230" y="194.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">md-raid1</text>
+<rect x="240" y="174" width="415.2" height="30" fill="#dc2626" />
+<text x="663.2" y="194.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">11.50 ms</text>
+<text x="230" y="232.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid0-hw1</text>
+<rect x="240" y="212" width="319.1" height="30" fill="#7c3aed" />
+<text x="567.1" y="232.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">5.69 ms</text>
+<text x="230" y="270.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid0-hw4</text>
+<rect x="240" y="250" width="332.8" height="30" fill="#0891b2" />
+<text x="580.8" y="270.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">6.31 ms</text>
+<text x="230" y="308.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid1-hw1</text>
+<rect x="240" y="288" width="376.5" height="30" fill="#db2777" />
+<text x="624.5" y="308.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">8.71 ms</text>
+<text x="230" y="346.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid1-hw4</text>
+<rect x="240" y="326" width="500.7" height="30" fill="#ca8a04" />
+<text x="748.7" y="346.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">20.94 ms</text>
+</svg></div>
+<h2>Tail shape</h2>
+<div class="panel"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 390" width="880" height="390" font-family="system-ui, sans-serif" font-size="14">
+<text x="80" y="24" font-weight="600" font-size="17">reader.Read latency spectrum</text>
+<text x="80" y="44" fill="#64748b" font-size="12">µs &middot; lower is better (log scale)</text>
+<line x1="80" y1="331.2" x2="640" y2="331.2" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="335.2" text-anchor="end" fill="#64748b" font-size="11">10µs</text>
+<line x1="80" y1="287.5" x2="640" y2="287.5" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="291.5" text-anchor="end" fill="#64748b" font-size="11">100µs</text>
+<line x1="80" y1="243.8" x2="640" y2="243.8" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="247.8" text-anchor="end" fill="#64748b" font-size="11">1.00ms</text>
+<line x1="80" y1="200.0" x2="640" y2="200.0" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="204.0" text-anchor="end" fill="#64748b" font-size="11">10.00ms</text>
+<line x1="80" y1="156.2" x2="640" y2="156.2" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="160.2" text-anchor="end" fill="#64748b" font-size="11">100ms</text>
+<line x1="80" y1="112.5" x2="640" y2="112.5" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="116.5" text-anchor="end" fill="#64748b" font-size="11">1.00s</text>
+<line x1="80" y1="68.8" x2="640" y2="68.8" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="72.8" text-anchor="end" fill="#64748b" font-size="11">10.00s</text>
+<line x1="80.0" y1="60" x2="80.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="80.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">p50</text>
+<line x1="220.0" y1="60" x2="220.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="220.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">p99</text>
+<line x1="360.0" y1="60" x2="360.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="360.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">p99.9</text>
+<line x1="500.0" y1="60" x2="500.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="500.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">p99.99</text>
+<line x1="640.0" y1="60" x2="640.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="640.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">max</text>
+<polyline fill="none" stroke="#2563eb" stroke-width="2" points="80.0,310.4 220.0,81.2 360.0,78.2 500.0,78.0 640.0,77.9" />
+<circle cx="80.0" cy="310.4" r="3.5" fill="#2563eb" />
+<circle cx="220.0" cy="81.2" r="3.5" fill="#2563eb" />
+<circle cx="360.0" cy="78.2" r="3.5" fill="#2563eb" />
+<circle cx="500.0" cy="78.0" r="3.5" fill="#2563eb" />
+<circle cx="640.0" cy="77.9" r="3.5" fill="#2563eb" />
+<polyline fill="none" stroke="#16a34a" stroke-width="2" points="80.0,321.2 220.0,200.4 360.0,174.8 500.0,170.5 640.0,168.3" />
+<circle cx="80.0" cy="321.2" r="3.5" fill="#16a34a" />
+<circle cx="220.0" cy="200.4" r="3.5" fill="#16a34a" />
+<circle cx="360.0" cy="174.8" r="3.5" fill="#16a34a" />
+<circle cx="500.0" cy="170.5" r="3.5" fill="#16a34a" />
+<circle cx="640.0" cy="168.3" r="3.5" fill="#16a34a" />
+<polyline fill="none" stroke="#d97706" stroke-width="2" points="80.0,313.1 220.0,242.1 360.0,205.8 500.0,197.7 640.0,192.3" />
+<circle cx="80.0" cy="313.1" r="3.5" fill="#d97706" />
+<circle cx="220.0" cy="242.1" r="3.5" fill="#d97706" />
+<circle cx="360.0" cy="205.8" r="3.5" fill="#d97706" />
+<circle cx="500.0" cy="197.7" r="3.5" fill="#d97706" />
+<circle cx="640.0" cy="192.3" r="3.5" fill="#d97706" />
+<polyline fill="none" stroke="#dc2626" stroke-width="2" points="80.0,320.1 220.0,114.7 360.0,107.9 500.0,107.7 640.0,107.6" />
+<circle cx="80.0" cy="320.1" r="3.5" fill="#dc2626" />
+<circle cx="220.0" cy="114.7" r="3.5" fill="#dc2626" />
+<circle cx="360.0" cy="107.9" r="3.5" fill="#dc2626" />
+<circle cx="500.0" cy="107.7" r="3.5" fill="#dc2626" />
+<circle cx="640.0" cy="107.6" r="3.5" fill="#dc2626" />
+<polyline fill="none" stroke="#7c3aed" stroke-width="2" points="80.0,309.1 220.0,236.5 360.0,197.4 500.0,186.6 640.0,182.6" />
+<circle cx="80.0" cy="309.1" r="3.5" fill="#7c3aed" />
+<circle cx="220.0" cy="236.5" r="3.5" fill="#7c3aed" />
+<circle cx="360.0" cy="197.4" r="3.5" fill="#7c3aed" />
+<circle cx="500.0" cy="186.6" r="3.5" fill="#7c3aed" />
+<circle cx="640.0" cy="182.6" r="3.5" fill="#7c3aed" />
+<polyline fill="none" stroke="#0891b2" stroke-width="2" points="80.0,310.4 220.0,235.9 360.0,167.0 500.0,162.4 640.0,161.1" />
+<circle cx="80.0" cy="310.4" r="3.5" fill="#0891b2" />
+<circle cx="220.0" cy="235.9" r="3.5" fill="#0891b2" />
+<circle cx="360.0" cy="167.0" r="3.5" fill="#0891b2" />
+<circle cx="500.0" cy="162.4" r="3.5" fill="#0891b2" />
+<circle cx="640.0" cy="161.1" r="3.5" fill="#0891b2" />
+<polyline fill="none" stroke="#db2777" stroke-width="2" points="80.0,308.0 220.0,124.1 360.0,119.9 500.0,119.2 640.0,119.0" />
+<circle cx="80.0" cy="308.0" r="3.5" fill="#db2777" />
+<circle cx="220.0" cy="124.1" r="3.5" fill="#db2777" />
+<circle cx="360.0" cy="119.9" r="3.5" fill="#db2777" />
+<circle cx="500.0" cy="119.2" r="3.5" fill="#db2777" />
+<circle cx="640.0" cy="119.0" r="3.5" fill="#db2777" />
+<polyline fill="none" stroke="#ca8a04" stroke-width="2" points="80.0,308.0 220.0,82.8 360.0,79.4 500.0,79.2 640.0,79.2" />
+<circle cx="80.0" cy="308.0" r="3.5" fill="#ca8a04" />
+<circle cx="220.0" cy="82.8" r="3.5" fill="#ca8a04" />
+<circle cx="360.0" cy="79.4" r="3.5" fill="#ca8a04" />
+<circle cx="500.0" cy="79.2" r="3.5" fill="#ca8a04" />
+<circle cx="640.0" cy="79.2" r="3.5" fill="#ca8a04" />
+<text x="656" y="72" font-size="12" font-weight="600" fill="#475569">scenarios</text>
+<rect x="656" y="82" width="14" height="3" fill="#2563eb" />
+<text x="676" y="90" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">baseline-alt</text>
+<rect x="656" y="98" width="14" height="3" fill="#16a34a" />
+<text x="676" y="106" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">baseline</text>
+<rect x="656" y="114" width="14" height="3" fill="#d97706" />
+<text x="676" y="122" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">md-raid0</text>
+<rect x="656" y="130" width="14" height="3" fill="#dc2626" />
+<text x="676" y="138" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">md-raid1</text>
+<rect x="656" y="146" width="14" height="3" fill="#7c3aed" />
+<text x="676" y="154" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">ublk-raid0-hw1</text>
+<rect x="656" y="162" width="14" height="3" fill="#0891b2" />
+<text x="676" y="170" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">ublk-raid0-hw4</text>
+<rect x="656" y="178" width="14" height="3" fill="#db2777" />
+<text x="676" y="186" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">ublk-raid1-hw1</text>
+<rect x="656" y="194" width="14" height="3" fill="#ca8a04" />
+<text x="676" y="202" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">ublk-raid1-hw4</text>
+</svg></div>
+<div class="panel"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 390" width="880" height="390" font-family="system-ui, sans-serif" font-size="14">
+<text x="80" y="24" font-weight="600" font-size="17">rand_writer.Write latency spectrum</text>
+<text x="80" y="44" fill="#64748b" font-size="12">µs &middot; lower is better (log scale)</text>
+<line x1="80" y1="331.2" x2="640" y2="331.2" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="335.2" text-anchor="end" fill="#64748b" font-size="11">10µs</text>
+<line x1="80" y1="287.5" x2="640" y2="287.5" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="291.5" text-anchor="end" fill="#64748b" font-size="11">100µs</text>
+<line x1="80" y1="243.8" x2="640" y2="243.8" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="247.8" text-anchor="end" fill="#64748b" font-size="11">1.00ms</text>
+<line x1="80" y1="200.0" x2="640" y2="200.0" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="204.0" text-anchor="end" fill="#64748b" font-size="11">10.00ms</text>
+<line x1="80" y1="156.2" x2="640" y2="156.2" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="160.2" text-anchor="end" fill="#64748b" font-size="11">100ms</text>
+<line x1="80" y1="112.5" x2="640" y2="112.5" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="116.5" text-anchor="end" fill="#64748b" font-size="11">1.00s</text>
+<line x1="80" y1="68.8" x2="640" y2="68.8" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="72.8" text-anchor="end" fill="#64748b" font-size="11">10.00s</text>
+<line x1="80.0" y1="60" x2="80.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="80.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">p50</text>
+<line x1="220.0" y1="60" x2="220.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="220.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">p99</text>
+<line x1="360.0" y1="60" x2="360.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="360.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">p99.9</text>
+<line x1="500.0" y1="60" x2="500.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="500.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">p99.99</text>
+<line x1="640.0" y1="60" x2="640.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="640.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">max</text>
+<polyline fill="none" stroke="#2563eb" stroke-width="2" points="80.0,322.3 220.0,123.6 360.0,105.2 500.0,104.2 640.0,104.0" />
+<circle cx="80.0" cy="322.3" r="3.5" fill="#2563eb" />
+<circle cx="220.0" cy="123.6" r="3.5" fill="#2563eb" />
+<circle cx="360.0" cy="105.2" r="3.5" fill="#2563eb" />
+<circle cx="500.0" cy="104.2" r="3.5" fill="#2563eb" />
+<circle cx="640.0" cy="104.0" r="3.5" fill="#2563eb" />
+<polyline fill="none" stroke="#16a34a" stroke-width="2" points="80.0,326.3 220.0,259.3 360.0,208.1 500.0,191.1 640.0,184.7" />
+<circle cx="80.0" cy="326.3" r="3.5" fill="#16a34a" />
+<circle cx="220.0" cy="259.3" r="3.5" fill="#16a34a" />
+<circle cx="360.0" cy="208.1" r="3.5" fill="#16a34a" />
+<circle cx="500.0" cy="191.1" r="3.5" fill="#16a34a" />
+<circle cx="640.0" cy="184.7" r="3.5" fill="#16a34a" />
+<polyline fill="none" stroke="#d97706" stroke-width="2" points="80.0,321.2 220.0,244.2 360.0,213.9 500.0,200.3 640.0,195.8" />
+<circle cx="80.0" cy="321.2" r="3.5" fill="#d97706" />
+<circle cx="220.0" cy="244.2" r="3.5" fill="#d97706" />
+<circle cx="360.0" cy="213.9" r="3.5" fill="#d97706" />
+<circle cx="500.0" cy="200.3" r="3.5" fill="#d97706" />
+<circle cx="640.0" cy="195.8" r="3.5" fill="#d97706" />
+<polyline fill="none" stroke="#dc2626" stroke-width="2" points="80.0,314.6 220.0,119.6 360.0,110.5 500.0,109.4 640.0,109.3" />
+<circle cx="80.0" cy="314.6" r="3.5" fill="#dc2626" />
+<circle cx="220.0" cy="119.6" r="3.5" fill="#dc2626" />
+<circle cx="360.0" cy="110.5" r="3.5" fill="#dc2626" />
+<circle cx="500.0" cy="109.4" r="3.5" fill="#dc2626" />
+<circle cx="640.0" cy="109.3" r="3.5" fill="#dc2626" />
+<polyline fill="none" stroke="#7c3aed" stroke-width="2" points="80.0,313.8 220.0,244.1 360.0,210.2 500.0,193.6 640.0,184.5" />
+<circle cx="80.0" cy="313.8" r="3.5" fill="#7c3aed" />
+<circle cx="220.0" cy="244.1" r="3.5" fill="#7c3aed" />
+<circle cx="360.0" cy="210.2" r="3.5" fill="#7c3aed" />
+<circle cx="500.0" cy="193.6" r="3.5" fill="#7c3aed" />
+<circle cx="640.0" cy="184.5" r="3.5" fill="#7c3aed" />
+<polyline fill="none" stroke="#0891b2" stroke-width="2" points="80.0,315.4 220.0,240.9 360.0,204.2 500.0,188.3 640.0,183.9" />
+<circle cx="80.0" cy="315.4" r="3.5" fill="#0891b2" />
+<circle cx="220.0" cy="240.9" r="3.5" fill="#0891b2" />
+<circle cx="360.0" cy="204.2" r="3.5" fill="#0891b2" />
+<circle cx="500.0" cy="188.3" r="3.5" fill="#0891b2" />
+<circle cx="640.0" cy="183.9" r="3.5" fill="#0891b2" />
+<polyline fill="none" stroke="#db2777" stroke-width="2" points="80.0,312.4 220.0,131.0 360.0,124.9 500.0,124.0 640.0,123.6" />
+<circle cx="80.0" cy="312.4" r="3.5" fill="#db2777" />
+<circle cx="220.0" cy="131.0" r="3.5" fill="#db2777" />
+<circle cx="360.0" cy="124.9" r="3.5" fill="#db2777" />
+<circle cx="500.0" cy="124.0" r="3.5" fill="#db2777" />
+<circle cx="640.0" cy="123.6" r="3.5" fill="#db2777" />
+<polyline fill="none" stroke="#ca8a04" stroke-width="2" points="80.0,313.8 220.0,120.4 360.0,103.8 500.0,103.1 640.0,103.0" />
+<circle cx="80.0" cy="313.8" r="3.5" fill="#ca8a04" />
+<circle cx="220.0" cy="120.4" r="3.5" fill="#ca8a04" />
+<circle cx="360.0" cy="103.8" r="3.5" fill="#ca8a04" />
+<circle cx="500.0" cy="103.1" r="3.5" fill="#ca8a04" />
+<circle cx="640.0" cy="103.0" r="3.5" fill="#ca8a04" />
+<text x="656" y="72" font-size="12" font-weight="600" fill="#475569">scenarios</text>
+<rect x="656" y="82" width="14" height="3" fill="#2563eb" />
+<text x="676" y="90" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">baseline-alt</text>
+<rect x="656" y="98" width="14" height="3" fill="#16a34a" />
+<text x="676" y="106" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">baseline</text>
+<rect x="656" y="114" width="14" height="3" fill="#d97706" />
+<text x="676" y="122" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">md-raid0</text>
+<rect x="656" y="130" width="14" height="3" fill="#dc2626" />
+<text x="676" y="138" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">md-raid1</text>
+<rect x="656" y="146" width="14" height="3" fill="#7c3aed" />
+<text x="676" y="154" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">ublk-raid0-hw1</text>
+<rect x="656" y="162" width="14" height="3" fill="#0891b2" />
+<text x="676" y="170" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">ublk-raid0-hw4</text>
+<rect x="656" y="178" width="14" height="3" fill="#db2777" />
+<text x="676" y="186" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">ublk-raid1-hw1</text>
+<rect x="656" y="194" width="14" height="3" fill="#ca8a04" />
+<text x="676" y="202" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">ublk-raid1-hw4</text>
+</svg></div>
+<div class="panel"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 390" width="880" height="390" font-family="system-ui, sans-serif" font-size="14">
+<text x="80" y="24" font-weight="600" font-size="17">wal.Write latency spectrum</text>
+<text x="80" y="44" fill="#64748b" font-size="12">µs &middot; lower is better (log scale)</text>
+<line x1="80" y1="329.6" x2="640" y2="329.6" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="333.6" text-anchor="end" fill="#64748b" font-size="11">10µs</text>
+<line x1="80" y1="277.8" x2="640" y2="277.8" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="281.8" text-anchor="end" fill="#64748b" font-size="11">100µs</text>
+<line x1="80" y1="225.9" x2="640" y2="225.9" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="229.9" text-anchor="end" fill="#64748b" font-size="11">1.00ms</text>
+<line x1="80" y1="174.1" x2="640" y2="174.1" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="178.1" text-anchor="end" fill="#64748b" font-size="11">10.00ms</text>
+<line x1="80" y1="122.2" x2="640" y2="122.2" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="126.2" text-anchor="end" fill="#64748b" font-size="11">100ms</text>
+<line x1="80" y1="70.4" x2="640" y2="70.4" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="74.4" text-anchor="end" fill="#64748b" font-size="11">1.00s</text>
+<line x1="80.0" y1="60" x2="80.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="80.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">p50</text>
+<line x1="220.0" y1="60" x2="220.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="220.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">p99</text>
+<line x1="360.0" y1="60" x2="360.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="360.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">p99.9</text>
+<line x1="500.0" y1="60" x2="500.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="500.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">p99.99</text>
+<line x1="640.0" y1="60" x2="640.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="640.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">max</text>
+<polyline fill="none" stroke="#2563eb" stroke-width="2" points="80.0,317.7 220.0,144.1 360.0,127.6 500.0,122.3 640.0,120.5" />
+<circle cx="80.0" cy="317.7" r="3.5" fill="#2563eb" />
+<circle cx="220.0" cy="144.1" r="3.5" fill="#2563eb" />
+<circle cx="360.0" cy="127.6" r="3.5" fill="#2563eb" />
+<circle cx="500.0" cy="122.3" r="3.5" fill="#2563eb" />
+<circle cx="640.0" cy="120.5" r="3.5" fill="#2563eb" />
+<polyline fill="none" stroke="#16a34a" stroke-width="2" points="80.0,322.1 220.0,245.0 360.0,188.4 500.0,171.9 640.0,156.1" />
+<circle cx="80.0" cy="322.1" r="3.5" fill="#16a34a" />
+<circle cx="220.0" cy="245.0" r="3.5" fill="#16a34a" />
+<circle cx="360.0" cy="188.4" r="3.5" fill="#16a34a" />
+<circle cx="500.0" cy="171.9" r="3.5" fill="#16a34a" />
+<circle cx="640.0" cy="156.1" r="3.5" fill="#16a34a" />
+<polyline fill="none" stroke="#d97706" stroke-width="2" points="80.0,317.7 220.0,233.4 360.0,199.8 500.0,183.1 640.0,171.4" />
+<circle cx="80.0" cy="317.7" r="3.5" fill="#d97706" />
+<circle cx="220.0" cy="233.4" r="3.5" fill="#d97706" />
+<circle cx="360.0" cy="199.8" r="3.5" fill="#d97706" />
+<circle cx="500.0" cy="183.1" r="3.5" fill="#d97706" />
+<circle cx="640.0" cy="171.4" r="3.5" fill="#d97706" />
+<polyline fill="none" stroke="#dc2626" stroke-width="2" points="80.0,309.9 220.0,156.6 360.0,122.9 500.0,116.3 640.0,114.6" />
+<circle cx="80.0" cy="309.9" r="3.5" fill="#dc2626" />
+<circle cx="220.0" cy="156.6" r="3.5" fill="#dc2626" />
+<circle cx="360.0" cy="122.9" r="3.5" fill="#dc2626" />
+<circle cx="500.0" cy="116.3" r="3.5" fill="#dc2626" />
+<circle cx="640.0" cy="114.6" r="3.5" fill="#dc2626" />
+<polyline fill="none" stroke="#7c3aed" stroke-width="2" points="80.0,309.0 220.0,233.0 360.0,195.5 500.0,177.9 640.0,155.9" />
+<circle cx="80.0" cy="309.0" r="3.5" fill="#7c3aed" />
+<circle cx="220.0" cy="233.0" r="3.5" fill="#7c3aed" />
+<circle cx="360.0" cy="195.5" r="3.5" fill="#7c3aed" />
+<circle cx="500.0" cy="177.9" r="3.5" fill="#7c3aed" />
+<circle cx="640.0" cy="155.9" r="3.5" fill="#7c3aed" />
+<polyline fill="none" stroke="#0891b2" stroke-width="2" points="80.0,310.9 220.0,227.0 360.0,187.9 500.0,166.7 640.0,156.0" />
+<circle cx="80.0" cy="310.9" r="3.5" fill="#0891b2" />
+<circle cx="220.0" cy="227.0" r="3.5" fill="#0891b2" />
+<circle cx="360.0" cy="187.9" r="3.5" fill="#0891b2" />
+<circle cx="500.0" cy="166.7" r="3.5" fill="#0891b2" />
+<circle cx="640.0" cy="156.0" r="3.5" fill="#0891b2" />
+<polyline fill="none" stroke="#db2777" stroke-width="2" points="80.0,307.3 220.0,183.4 360.0,170.3 500.0,159.9 640.0,155.6" />
+<circle cx="80.0" cy="307.3" r="3.5" fill="#db2777" />
+<circle cx="220.0" cy="183.4" r="3.5" fill="#db2777" />
+<circle cx="360.0" cy="170.3" r="3.5" fill="#db2777" />
+<circle cx="500.0" cy="159.9" r="3.5" fill="#db2777" />
+<circle cx="640.0" cy="155.6" r="3.5" fill="#db2777" />
+<polyline fill="none" stroke="#ca8a04" stroke-width="2" points="80.0,309.0 220.0,157.2 360.0,145.7 500.0,140.2 640.0,137.7" />
+<circle cx="80.0" cy="309.0" r="3.5" fill="#ca8a04" />
+<circle cx="220.0" cy="157.2" r="3.5" fill="#ca8a04" />
+<circle cx="360.0" cy="145.7" r="3.5" fill="#ca8a04" />
+<circle cx="500.0" cy="140.2" r="3.5" fill="#ca8a04" />
+<circle cx="640.0" cy="137.7" r="3.5" fill="#ca8a04" />
+<text x="656" y="72" font-size="12" font-weight="600" fill="#475569">scenarios</text>
+<rect x="656" y="82" width="14" height="3" fill="#2563eb" />
+<text x="676" y="90" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">baseline-alt</text>
+<rect x="656" y="98" width="14" height="3" fill="#16a34a" />
+<text x="676" y="106" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">baseline</text>
+<rect x="656" y="114" width="14" height="3" fill="#d97706" />
+<text x="676" y="122" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">md-raid0</text>
+<rect x="656" y="130" width="14" height="3" fill="#dc2626" />
+<text x="676" y="138" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">md-raid1</text>
+<rect x="656" y="146" width="14" height="3" fill="#7c3aed" />
+<text x="676" y="154" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">ublk-raid0-hw1</text>
+<rect x="656" y="162" width="14" height="3" fill="#0891b2" />
+<text x="676" y="170" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">ublk-raid0-hw4</text>
+<rect x="656" y="178" width="14" height="3" fill="#db2777" />
+<text x="676" y="186" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">ublk-raid1-hw1</text>
+<rect x="656" y="194" width="14" height="3" fill="#ca8a04" />
+<text x="676" y="202" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">ublk-raid1-hw4</text>
+</svg></div>
+<div class="panel"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 390" width="880" height="390" font-family="system-ui, sans-serif" font-size="14">
+<text x="80" y="24" font-weight="600" font-size="17">wal.Fsync latency spectrum</text>
+<text x="80" y="44" fill="#64748b" font-size="12">µs &middot; lower is better (log scale)</text>
+<line x1="80" y1="327.3" x2="640" y2="327.3" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="331.3" text-anchor="end" fill="#64748b" font-size="11">100µs</text>
+<line x1="80" y1="263.6" x2="640" y2="263.6" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="267.6" text-anchor="end" fill="#64748b" font-size="11">1.00ms</text>
+<line x1="80" y1="200.0" x2="640" y2="200.0" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="204.0" text-anchor="end" fill="#64748b" font-size="11">10.00ms</text>
+<line x1="80" y1="136.4" x2="640" y2="136.4" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="140.4" text-anchor="end" fill="#64748b" font-size="11">100ms</text>
+<line x1="80" y1="72.7" x2="640" y2="72.7" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="76.7" text-anchor="end" fill="#64748b" font-size="11">1.00s</text>
+<line x1="80.0" y1="60" x2="80.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="80.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">p50</text>
+<line x1="220.0" y1="60" x2="220.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="220.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">p99</text>
+<line x1="360.0" y1="60" x2="360.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="360.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">p99.9</text>
+<line x1="500.0" y1="60" x2="500.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="500.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">p99.99</text>
+<line x1="640.0" y1="60" x2="640.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="640.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">max</text>
+<polyline fill="none" stroke="#2563eb" stroke-width="2" points="80.0,285.8 220.0,152.3 360.0,142.3 500.0,135.0 640.0,135.0" />
+<circle cx="80.0" cy="285.8" r="3.5" fill="#2563eb" />
+<circle cx="220.0" cy="152.3" r="3.5" fill="#2563eb" />
+<circle cx="360.0" cy="142.3" r="3.5" fill="#2563eb" />
+<circle cx="500.0" cy="135.0" r="3.5" fill="#2563eb" />
+<circle cx="640.0" cy="135.0" r="3.5" fill="#2563eb" />
+<polyline fill="none" stroke="#16a34a" stroke-width="2" points="80.0,290.9 220.0,258.6 360.0,234.8 500.0,220.7 640.0,220.7" />
+<circle cx="80.0" cy="290.9" r="3.5" fill="#16a34a" />
+<circle cx="220.0" cy="258.6" r="3.5" fill="#16a34a" />
+<circle cx="360.0" cy="234.8" r="3.5" fill="#16a34a" />
+<circle cx="500.0" cy="220.7" r="3.5" fill="#16a34a" />
+<circle cx="640.0" cy="220.7" r="3.5" fill="#16a34a" />
+<polyline fill="none" stroke="#d97706" stroke-width="2" points="80.0,286.3 220.0,245.0 360.0,242.5 500.0,232.0 640.0,232.0" />
+<circle cx="80.0" cy="286.3" r="3.5" fill="#d97706" />
+<circle cx="220.0" cy="245.0" r="3.5" fill="#d97706" />
+<circle cx="360.0" cy="242.5" r="3.5" fill="#d97706" />
+<circle cx="500.0" cy="232.0" r="3.5" fill="#d97706" />
+<circle cx="640.0" cy="232.0" r="3.5" fill="#d97706" />
+<polyline fill="none" stroke="#dc2626" stroke-width="2" points="80.0,280.1 220.0,184.5 360.0,135.3 500.0,135.3 640.0,135.3" />
+<circle cx="80.0" cy="280.1" r="3.5" fill="#dc2626" />
+<circle cx="220.0" cy="184.5" r="3.5" fill="#dc2626" />
+<circle cx="360.0" cy="135.3" r="3.5" fill="#dc2626" />
+<circle cx="500.0" cy="135.3" r="3.5" fill="#dc2626" />
+<circle cx="640.0" cy="135.3" r="3.5" fill="#dc2626" />
+<polyline fill="none" stroke="#7c3aed" stroke-width="2" points="80.0,322.0 220.0,263.6 360.0,259.5 500.0,248.0 640.0,248.0" />
+<circle cx="80.0" cy="322.0" r="3.5" fill="#7c3aed" />
+<circle cx="220.0" cy="263.6" r="3.5" fill="#7c3aed" />
+<circle cx="360.0" cy="259.5" r="3.5" fill="#7c3aed" />
+<circle cx="500.0" cy="248.0" r="3.5" fill="#7c3aed" />
+<circle cx="640.0" cy="248.0" r="3.5" fill="#7c3aed" />
+<polyline fill="none" stroke="#0891b2" stroke-width="2" points="80.0,322.0 220.0,269.7 360.0,228.1 500.0,221.9 640.0,221.9" />
+<circle cx="80.0" cy="322.0" r="3.5" fill="#0891b2" />
+<circle cx="220.0" cy="269.7" r="3.5" fill="#0891b2" />
+<circle cx="360.0" cy="228.1" r="3.5" fill="#0891b2" />
+<circle cx="500.0" cy="221.9" r="3.5" fill="#0891b2" />
+<circle cx="640.0" cy="221.9" r="3.5" fill="#0891b2" />
+<polyline fill="none" stroke="#db2777" stroke-width="2" points="80.0,319.4 220.0,208.9 360.0,200.0 500.0,184.1 640.0,184.1" />
+<circle cx="80.0" cy="319.4" r="3.5" fill="#db2777" />
+<circle cx="220.0" cy="208.9" r="3.5" fill="#db2777" />
+<circle cx="360.0" cy="200.0" r="3.5" fill="#db2777" />
+<circle cx="500.0" cy="184.1" r="3.5" fill="#db2777" />
+<circle cx="640.0" cy="184.1" r="3.5" fill="#db2777" />
+<polyline fill="none" stroke="#ca8a04" stroke-width="2" points="80.0,315.3 220.0,181.7 360.0,166.7 500.0,163.0 640.0,163.0" />
+<circle cx="80.0" cy="315.3" r="3.5" fill="#ca8a04" />
+<circle cx="220.0" cy="181.7" r="3.5" fill="#ca8a04" />
+<circle cx="360.0" cy="166.7" r="3.5" fill="#ca8a04" />
+<circle cx="500.0" cy="163.0" r="3.5" fill="#ca8a04" />
+<circle cx="640.0" cy="163.0" r="3.5" fill="#ca8a04" />
+<text x="656" y="72" font-size="12" font-weight="600" fill="#475569">scenarios</text>
+<rect x="656" y="82" width="14" height="3" fill="#2563eb" />
+<text x="676" y="90" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">baseline-alt</text>
+<rect x="656" y="98" width="14" height="3" fill="#16a34a" />
+<text x="676" y="106" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">baseline</text>
+<rect x="656" y="114" width="14" height="3" fill="#d97706" />
+<text x="676" y="122" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">md-raid0</text>
+<rect x="656" y="130" width="14" height="3" fill="#dc2626" />
+<text x="676" y="138" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">md-raid1</text>
+<rect x="656" y="146" width="14" height="3" fill="#7c3aed" />
+<text x="676" y="154" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">ublk-raid0-hw1</text>
+<rect x="656" y="162" width="14" height="3" fill="#0891b2" />
+<text x="676" y="170" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">ublk-raid0-hw4</text>
+<rect x="656" y="178" width="14" height="3" fill="#db2777" />
+<text x="676" y="186" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">ublk-raid1-hw1</text>
+<rect x="656" y="194" width="14" height="3" fill="#ca8a04" />
+<text x="676" y="202" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">ublk-raid1-hw4</text>
+</svg></div>
+<div class="panel"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 390" width="880" height="390" font-family="system-ui, sans-serif" font-size="14">
+<text x="80" y="24" font-weight="600" font-size="17">ckpt.Write latency spectrum</text>
+<text x="80" y="44" fill="#64748b" font-size="12">µs &middot; lower is better (log scale)</text>
+<line x1="80" y1="327.3" x2="640" y2="327.3" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="331.3" text-anchor="end" fill="#64748b" font-size="11">100µs</text>
+<line x1="80" y1="263.6" x2="640" y2="263.6" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="267.6" text-anchor="end" fill="#64748b" font-size="11">1.00ms</text>
+<line x1="80" y1="200.0" x2="640" y2="200.0" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="204.0" text-anchor="end" fill="#64748b" font-size="11">10.00ms</text>
+<line x1="80" y1="136.4" x2="640" y2="136.4" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="140.4" text-anchor="end" fill="#64748b" font-size="11">100ms</text>
+<line x1="80" y1="72.7" x2="640" y2="72.7" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="76.7" text-anchor="end" fill="#64748b" font-size="11">1.00s</text>
+<line x1="80.0" y1="60" x2="80.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="80.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">p50</text>
+<line x1="220.0" y1="60" x2="220.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="220.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">p99</text>
+<line x1="360.0" y1="60" x2="360.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="360.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">p99.9</text>
+<line x1="500.0" y1="60" x2="500.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="500.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">p99.99</text>
+<line x1="640.0" y1="60" x2="640.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="640.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">max</text>
+<polyline fill="none" stroke="#2563eb" stroke-width="2" points="80.0,254.8 220.0,177.8 360.0,153.0 500.0,142.7 640.0,139.9" />
+<circle cx="80.0" cy="254.8" r="3.5" fill="#2563eb" />
+<circle cx="220.0" cy="177.8" r="3.5" fill="#2563eb" />
+<circle cx="360.0" cy="153.0" r="3.5" fill="#2563eb" />
+<circle cx="500.0" cy="142.7" r="3.5" fill="#2563eb" />
+<circle cx="640.0" cy="139.9" r="3.5" fill="#2563eb" />
+<polyline fill="none" stroke="#16a34a" stroke-width="2" points="80.0,287.3 220.0,232.6 360.0,199.2 500.0,193.1 640.0,193.1" />
+<circle cx="80.0" cy="287.3" r="3.5" fill="#16a34a" />
+<circle cx="220.0" cy="232.6" r="3.5" fill="#16a34a" />
+<circle cx="360.0" cy="199.2" r="3.5" fill="#16a34a" />
+<circle cx="500.0" cy="193.1" r="3.5" fill="#16a34a" />
+<circle cx="640.0" cy="193.1" r="3.5" fill="#16a34a" />
+<polyline fill="none" stroke="#d97706" stroke-width="2" points="80.0,278.5 220.0,214.3 360.0,209.9 500.0,196.4 640.0,196.2" />
+<circle cx="80.0" cy="278.5" r="3.5" fill="#d97706" />
+<circle cx="220.0" cy="214.3" r="3.5" fill="#d97706" />
+<circle cx="360.0" cy="209.9" r="3.5" fill="#d97706" />
+<circle cx="500.0" cy="196.4" r="3.5" fill="#d97706" />
+<circle cx="640.0" cy="196.2" r="3.5" fill="#d97706" />
+<polyline fill="none" stroke="#dc2626" stroke-width="2" points="80.0,237.6 220.0,196.1 360.0,152.0 500.0,138.6 640.0,135.1" />
+<circle cx="80.0" cy="237.6" r="3.5" fill="#dc2626" />
+<circle cx="220.0" cy="196.1" r="3.5" fill="#dc2626" />
+<circle cx="360.0" cy="152.0" r="3.5" fill="#dc2626" />
+<circle cx="500.0" cy="138.6" r="3.5" fill="#dc2626" />
+<circle cx="640.0" cy="135.1" r="3.5" fill="#dc2626" />
+<polyline fill="none" stroke="#7c3aed" stroke-width="2" points="80.0,278.0 220.0,215.6 360.0,210.4 500.0,196.7 640.0,196.5" />
+<circle cx="80.0" cy="278.0" r="3.5" fill="#7c3aed" />
+<circle cx="220.0" cy="215.6" r="3.5" fill="#7c3aed" />
+<circle cx="360.0" cy="210.4" r="3.5" fill="#7c3aed" />
+<circle cx="500.0" cy="196.7" r="3.5" fill="#7c3aed" />
+<circle cx="640.0" cy="196.5" r="3.5" fill="#7c3aed" />
+<polyline fill="none" stroke="#0891b2" stroke-width="2" points="80.0,276.5 220.0,212.7 360.0,200.4 500.0,187.8 640.0,185.7" />
+<circle cx="80.0" cy="276.5" r="3.5" fill="#0891b2" />
+<circle cx="220.0" cy="212.7" r="3.5" fill="#0891b2" />
+<circle cx="360.0" cy="200.4" r="3.5" fill="#0891b2" />
+<circle cx="500.0" cy="187.8" r="3.5" fill="#0891b2" />
+<circle cx="640.0" cy="185.7" r="3.5" fill="#0891b2" />
+<polyline fill="none" stroke="#db2777" stroke-width="2" points="80.0,254.8 220.0,203.8 360.0,186.9 500.0,183.3 640.0,178.4" />
+<circle cx="80.0" cy="254.8" r="3.5" fill="#db2777" />
+<circle cx="220.0" cy="203.8" r="3.5" fill="#db2777" />
+<circle cx="360.0" cy="186.9" r="3.5" fill="#db2777" />
+<circle cx="500.0" cy="183.3" r="3.5" fill="#db2777" />
+<circle cx="640.0" cy="178.4" r="3.5" fill="#db2777" />
+<polyline fill="none" stroke="#ca8a04" stroke-width="2" points="80.0,254.1 220.0,179.6 360.0,166.1 500.0,157.3 640.0,157.3" />
+<circle cx="80.0" cy="254.1" r="3.5" fill="#ca8a04" />
+<circle cx="220.0" cy="179.6" r="3.5" fill="#ca8a04" />
+<circle cx="360.0" cy="166.1" r="3.5" fill="#ca8a04" />
+<circle cx="500.0" cy="157.3" r="3.5" fill="#ca8a04" />
+<circle cx="640.0" cy="157.3" r="3.5" fill="#ca8a04" />
+<text x="656" y="72" font-size="12" font-weight="600" fill="#475569">scenarios</text>
+<rect x="656" y="82" width="14" height="3" fill="#2563eb" />
+<text x="676" y="90" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">baseline-alt</text>
+<rect x="656" y="98" width="14" height="3" fill="#16a34a" />
+<text x="676" y="106" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">baseline</text>
+<rect x="656" y="114" width="14" height="3" fill="#d97706" />
+<text x="676" y="122" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">md-raid0</text>
+<rect x="656" y="130" width="14" height="3" fill="#dc2626" />
+<text x="676" y="138" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">md-raid1</text>
+<rect x="656" y="146" width="14" height="3" fill="#7c3aed" />
+<text x="676" y="154" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">ublk-raid0-hw1</text>
+<rect x="656" y="162" width="14" height="3" fill="#0891b2" />
+<text x="676" y="170" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">ublk-raid0-hw4</text>
+<rect x="656" y="178" width="14" height="3" fill="#db2777" />
+<text x="676" y="186" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">ublk-raid1-hw1</text>
+<rect x="656" y="194" width="14" height="3" fill="#ca8a04" />
+<text x="676" y="202" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">ublk-raid1-hw4</text>
+</svg></div>
+<h2>Device capabilities</h2>
+<p class="meta">As reported by the kernel at probe time. These are
+advertised device capabilities, not proof that a specific operation path used
+or honored them. billet submits wal.Fsync with fsync; <code>fua</code> only
+says whether the device advertises FUA writes.</p>
+<div class="panel"><table><thead><tr><th>scenario</th><th>fua</th><th>discard</th><th>write_zeroes</th><th>rotational</th><th>logical / physical block</th></tr></thead><tbody><tr><td>baseline-alt</td><td style="color:#0f172a">yes</td><td style="color:#0f172a">yes</td><td style="color:#0f172a">yes</td><td style="color:#b45309">no</td><td>512 / 512</td></tr><tr><td>baseline</td><td style="color:#0f172a">yes</td><td style="color:#0f172a">yes</td><td style="color:#b45309">no</td><td style="color:#b45309">no</td><td>512 / 512</td></tr><tr><td>md-raid0</td><td style="color:#0f172a">yes</td><td style="color:#0f172a">yes</td><td style="color:#b45309">no</td><td style="color:#b45309">no</td><td>512 / 512</td></tr><tr><td>md-raid1</td><td style="color:#0f172a">yes</td><td style="color:#0f172a">yes</td><td style="color:#b45309">no</td><td style="color:#b45309">no</td><td>512 / 512</td></tr><tr><td>ublk-raid0-hw1</td><td style="color:#0f172a">yes</td><td style="color:#0f172a">yes</td><td style="color:#b45309">no</td><td style="color:#b45309">no</td><td>4096 / 131072</td></tr><tr><td>ublk-raid0-hw4</td><td style="color:#0f172a">yes</td><td style="color:#0f172a">yes</td><td style="color:#b45309">no</td><td style="color:#b45309">no</td><td>4096 / 131072</td></tr><tr><td>ublk-raid1-hw1</td><td style="color:#0f172a">yes</td><td style="color:#0f172a">yes</td><td style="color:#b45309">no</td><td style="color:#b45309">no</td><td>4096 / 4096</td></tr><tr><td>ublk-raid1-hw4</td><td style="color:#0f172a">yes</td><td style="color:#0f172a">yes</td><td style="color:#b45309">no</td><td style="color:#b45309">no</td><td>4096 / 4096</td></tr></tbody></table></div>
+<h2>p99 vs reference</h2>
+<div class="panel"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 910 370" width="910" height="370" font-family="system-ui, sans-serif" font-size="14">
+<text x="240" y="24" font-weight="600" font-size="17">p99 latency vs reference</text>
+<text x="240" y="44" fill="#64748b" font-size="12">ratio &middot; lower is better &middot; reference: <tspan font-family="ui-monospace, monospace" fill="#0f172a">baseline</tspan></text>
+<text x="305.0" y="72" text-anchor="middle" font-size="12" font-family="ui-monospace, monospace" fill="#475569">reader.Read</text>
+<text x="435.0" y="72" text-anchor="middle" font-size="12" font-family="ui-monospace, monospace" fill="#475569">rand_writer.Write</text>
+<text x="565.0" y="72" text-anchor="middle" font-size="12" font-family="ui-monospace, monospace" fill="#475569">wal.Write</text>
+<text x="695.0" y="72" text-anchor="middle" font-size="12" font-family="ui-monospace, monospace" fill="#475569">wal.Fsync</text>
+<text x="825.0" y="72" text-anchor="middle" font-size="12" font-family="ui-monospace, monospace" fill="#475569">ckpt.Write</text>
+<text x="230" y="104.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">baseline-alt</text>
+<rect x="240.0" y="80.0" width="130" height="38" fill="#df3a3a" stroke="#e2e8f0" />
+<text x="305.0" y="104.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">528x</text>
+<rect x="370.0" y="80.0" width="130" height="38" fill="#dc2626" stroke="#e2e8f0" />
+<text x="435.0" y="104.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">1,269x</text>
+<rect x="500.0" y="80.0" width="130" height="38" fill="#e87272" stroke="#e2e8f0" />
+<text x="565.0" y="104.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">89x</text>
+<rect x="630.0" y="80.0" width="130" height="38" fill="#ec8686" stroke="#e2e8f0" />
+<text x="695.0" y="104.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">47x</text>
+<rect x="760.0" y="80.0" width="130" height="38" fill="#f5c1c1" stroke="#e2e8f0" />
+<text x="825.0" y="104.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">7.26x</text>
+<text x="230" y="142.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">md-raid0</text>
+<rect x="240.0" y="118.0" width="130" height="38" fill="#20a752" stroke="#e2e8f0" />
+<text x="305.0" y="142.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">0.11x</text>
+<rect x="370.0" y="118.0" width="130" height="38" fill="#fbe6e6" stroke="#e2e8f0" />
+<text x="435.0" y="142.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">2.23x</text>
+<rect x="500.0" y="118.0" width="130" height="38" fill="#fcefef" stroke="#e2e8f0" />
+<text x="565.0" y="142.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">1.67x</text>
+<rect x="630.0" y="118.0" width="130" height="38" fill="#fcefef" stroke="#e2e8f0" />
+<text x="695.0" y="142.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">1.64x</text>
+<rect x="760.0" y="118.0" width="130" height="38" fill="#fceaea" stroke="#e2e8f0" />
+<text x="825.0" y="142.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">1.94x</text>
+<text x="230" y="180.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">md-raid1</text>
+<rect x="240.0" y="156.0" width="130" height="38" fill="#e87171" stroke="#e2e8f0" />
+<text x="305.0" y="180.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">91x</text>
+<rect x="370.0" y="156.0" width="130" height="38" fill="#dc2626" stroke="#e2e8f0" />
+<text x="435.0" y="180.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">1,567x</text>
+<rect x="500.0" y="156.0" width="130" height="38" fill="#eb8484" stroke="#e2e8f0" />
+<text x="565.0" y="180.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">51x</text>
+<rect x="630.0" y="156.0" width="130" height="38" fill="#f1abab" stroke="#e2e8f0" />
+<text x="695.0" y="180.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">15x</text>
+<rect x="760.0" y="156.0" width="130" height="38" fill="#f8d6d6" stroke="#e2e8f0" />
+<text x="825.0" y="180.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">3.74x</text>
+<text x="230" y="218.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid0-hw1</text>
+<rect x="240.0" y="194.0" width="130" height="38" fill="#3eb369" stroke="#e2e8f0" />
+<text x="305.0" y="218.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">0.15x</text>
+<rect x="370.0" y="194.0" width="130" height="38" fill="#fbe6e6" stroke="#e2e8f0" />
+<text x="435.0" y="218.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">2.23x</text>
+<rect x="500.0" y="194.0" width="130" height="38" fill="#fceeee" stroke="#e2e8f0" />
+<text x="565.0" y="218.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">1.71x</text>
+<rect x="630.0" y="194.0" width="130" height="38" fill="#edf8f1" stroke="#e2e8f0" />
+<text x="695.0" y="218.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">0.83x</text>
+<rect x="760.0" y="194.0" width="130" height="38" fill="#fcecec" stroke="#e2e8f0" />
+<text x="825.0" y="218.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">1.85x</text>
+<text x="230" y="256.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid0-hw4</text>
+<rect x="240.0" y="232.0" width="130" height="38" fill="#42b46c" stroke="#e2e8f0" />
+<text x="305.0" y="256.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">0.15x</text>
+<rect x="370.0" y="232.0" width="130" height="38" fill="#fae0e0" stroke="#e2e8f0" />
+<text x="435.0" y="256.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">2.64x</text>
+<rect x="500.0" y="232.0" width="130" height="38" fill="#fbe6e6" stroke="#e2e8f0" />
+<text x="565.0" y="256.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">2.23x</text>
+<rect x="630.0" y="232.0" width="130" height="38" fill="#d6efdf" stroke="#e2e8f0" />
+<text x="695.0" y="256.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">0.67x</text>
+<rect x="760.0" y="232.0" width="130" height="38" fill="#fbe8e8" stroke="#e2e8f0" />
+<text x="825.0" y="256.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">2.05x</text>
+<text x="230" y="294.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid1-hw1</text>
+<rect x="240.0" y="270.0" width="130" height="38" fill="#eb8181" stroke="#e2e8f0" />
+<text x="305.0" y="294.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">55x</text>
+<rect x="370.0" y="270.0" width="130" height="38" fill="#dd2b2b" stroke="#e2e8f0" />
+<text x="435.0" y="294.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">857x</text>
+<rect x="500.0" y="270.0" width="130" height="38" fill="#f1a9a9" stroke="#e2e8f0" />
+<text x="565.0" y="294.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">15x</text>
+<rect x="630.0" y="270.0" width="130" height="38" fill="#f6c7c7" stroke="#e2e8f0" />
+<text x="695.0" y="294.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">6.04x</text>
+<rect x="760.0" y="270.0" width="130" height="38" fill="#fadede" stroke="#e2e8f0" />
+<text x="825.0" y="294.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">2.83x</text>
+<text x="230" y="332.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">ublk-raid1-hw4</text>
+<rect x="240.0" y="308.0" width="130" height="38" fill="#e03d3d" stroke="#e2e8f0" />
+<text x="305.0" y="332.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">487x</text>
+<rect x="370.0" y="308.0" width="130" height="38" fill="#dc2626" stroke="#e2e8f0" />
+<text x="435.0" y="332.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">1,503x</text>
+<rect x="500.0" y="308.0" width="130" height="38" fill="#eb8484" stroke="#e2e8f0" />
+<text x="565.0" y="332.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">50x</text>
+<rect x="630.0" y="308.0" width="130" height="38" fill="#f1a8a8" stroke="#e2e8f0" />
+<text x="695.0" y="332.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">16x</text>
+<rect x="760.0" y="308.0" width="130" height="38" fill="#f5c3c3" stroke="#e2e8f0" />
+<text x="825.0" y="332.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">6.81x</text>
+</svg></div>
+<details><summary>sanity: errors &amp; component_drops (zero on clean runs)</summary>
+<table><thead><tr><th>scenario</th><th>errors</th><th>component_drops</th><th></th></tr></thead><tbody><tr><td>baseline-alt</td><td>0</td><td>0</td><td></td></tr><tr><td>baseline</td><td>0</td><td>0</td><td></td></tr><tr><td>md-raid0</td><td>0</td><td>0</td><td></td></tr><tr><td>md-raid1</td><td>0</td><td>0</td><td></td></tr><tr><td>ublk-raid0-hw1</td><td>0</td><td>0</td><td></td></tr><tr><td>ublk-raid0-hw4</td><td>0</td><td>0</td><td></td></tr><tr><td>ublk-raid1-hw1</td><td>0</td><td>0</td><td></td></tr><tr><td>ublk-raid1-hw4</td><td>0</td><td>0</td><td></td></tr></tbody></table>
+</details>
+</body>
+</html>

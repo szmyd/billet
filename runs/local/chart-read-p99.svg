@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 380" role="img" aria-label="reader.Read p99 by scenario, log scale">
+  <style>
+    .axis-tick { font: 10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; fill: #6b7280; }
+    .axis-label { font: 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; fill: #6b7280; }
+    .panel-title { font: 600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; fill: #18181b; }
+    .grid-line { stroke: #e5e7eb; stroke-width: 1; stroke-dasharray: 2,3; }
+  </style>
+  <text x="400" y="20" class="panel-title" text-anchor="middle">reader.Read p99 by scenario (log scale, lower is better)</text>
+  <line x1="80" y1="280" x2="780" y2="280" stroke="#9ca3af" stroke-width="1"/>
+  <line x1="80" y1="40"  x2="80"  y2="280" stroke="#9ca3af" stroke-width="1"/>
+  <text x="40" y="284" class="axis-tick" text-anchor="end">1 ms</text>
+  <text x="40" y="224" class="axis-tick" text-anchor="end">10 ms</text>
+  <text x="40" y="164" class="axis-tick" text-anchor="end">100 ms</text>
+  <text x="40" y="104" class="axis-tick" text-anchor="end">1 s</text>
+  <text x="40" y="44"  class="axis-tick" text-anchor="end">10 s</text>
+  <line x1="80" y1="220" x2="780" y2="220" class="grid-line"/>
+  <line x1="80" y1="160" x2="780" y2="160" class="grid-line"/>
+  <line x1="80" y1="100" x2="780" y2="100" class="grid-line"/>
+  <line x1="80" y1="40"  x2="780" y2="40"  class="grid-line"/>
+  <text x="20" y="160" class="axis-label" text-anchor="middle" transform="rotate(-90 20 160)">p99 (log)</text>
+  <rect x="85"  y="220" width="70" height="60"  fill="#2563eb"/>
+  <text x="120" y="214" class="axis-tick" text-anchor="middle">9.8 ms</text>
+  <rect x="172" y="57"  width="70" height="223" fill="#dc2626"/>
+  <text x="207" y="51"  class="axis-tick" text-anchor="middle">5.2 s</text>
+  <rect x="259" y="278" width="70" height="2"   fill="#475569"/>
+  <text x="294" y="272" class="axis-tick" text-anchor="middle">1.1 ms</text>
+  <rect x="346" y="103" width="70" height="177" fill="#94a3b8"/>
+  <text x="381" y="97"  class="axis-tick" text-anchor="middle">893 ms</text>
+  <rect x="433" y="270" width="70" height="10"  fill="#16a34a"/>
+  <text x="468" y="264" class="axis-tick" text-anchor="middle">1.5 ms</text>
+  <rect x="520" y="269" width="70" height="11"  fill="#65a30d"/>
+  <text x="555" y="263" class="axis-tick" text-anchor="middle">1.5 ms</text>
+  <rect x="607" y="116" width="70" height="164" fill="#d97706"/>
+  <text x="642" y="110" class="axis-tick" text-anchor="middle">543 ms</text>
+  <rect x="694" y="59"  width="70" height="221" fill="#ca8a04"/>
+  <text x="729" y="53"  class="axis-tick" text-anchor="middle">4.8 s</text>
+  <g class="axis-tick">
+    <text transform="translate(120,294) rotate(-30)">baseline</text>
+    <text transform="translate(207,294) rotate(-30)">baseline-alt</text>
+    <text transform="translate(294,294) rotate(-30)">md-raid0</text>
+    <text transform="translate(381,294) rotate(-30)">md-raid1</text>
+    <text transform="translate(468,294) rotate(-30)">ublk-r0-hw1</text>
+    <text transform="translate(555,294) rotate(-30)">ublk-r0-hw4</text>
+    <text transform="translate(642,294) rotate(-30)">ublk-r1-hw1</text>
+    <text transform="translate(729,294) rotate(-30)">ublk-r1-hw4</text>
+  </g>
+</svg>

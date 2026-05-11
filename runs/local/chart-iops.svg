@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 340" role="img" aria-label="Aggregate IOPS by scenario">
+  <style>
+    .axis-tick { font: 10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; fill: #6b7280; }
+    .axis-label { font: 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; fill: #6b7280; }
+    .panel-title { font: 600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; fill: #18181b; }
+    .grid-line { stroke: #e5e7eb; stroke-width: 1; stroke-dasharray: 2,3; }
+    .ref-line  { stroke: #d97706; stroke-width: 1; stroke-dasharray: 4,3; }
+  </style>
+  <text x="400" y="20" class="panel-title" text-anchor="middle">Aggregate IOPS by scenario (linear scale, narrow range)</text>
+  <line x1="80" y1="280" x2="780" y2="280" stroke="#9ca3af" stroke-width="1"/>
+  <line x1="80" y1="40"  x2="80"  y2="280" stroke="#9ca3af" stroke-width="1"/>
+  <text x="40" y="284" class="axis-tick" text-anchor="end">15500</text>
+  <text x="40" y="221" class="axis-tick" text-anchor="end">15700</text>
+  <text x="40" y="158" class="axis-tick" text-anchor="end">15900</text>
+  <text x="40" y="95"  class="axis-tick" text-anchor="end">16100</text>
+  <line x1="80" y1="217" x2="780" y2="217" class="grid-line"/>
+  <line x1="80" y1="154" x2="780" y2="154" class="grid-line"/>
+  <line x1="80" y1="91"  x2="780" y2="91"  class="grid-line"/>
+  <text x="20" y="160" class="axis-label" text-anchor="middle" transform="rotate(-90 20 160)">IOPS</text>
+  <line x1="80" y1="248" x2="780" y2="248" class="ref-line"/>
+  <text x="780" y="244" class="axis-tick" text-anchor="end" fill="#d97706">scheduled ~15.4k</text>
+  <rect x="85"  y="138" width="70" height="142" fill="#2563eb"/>
+  <rect x="172" y="245" width="70" height="35"  fill="#dc2626"/>
+  <rect x="259" y="154" width="70" height="126" fill="#475569"/>
+  <rect x="346" y="81"  width="70" height="199" fill="#94a3b8"/>
+  <rect x="433" y="159" width="70" height="121" fill="#16a34a"/>
+  <rect x="520" y="162" width="70" height="118" fill="#65a30d"/>
+  <rect x="607" y="198" width="70" height="82"  fill="#d97706"/>
+  <rect x="694" y="93"  width="70" height="187" fill="#ca8a04"/>
+  <text x="120" y="132" class="axis-tick" text-anchor="middle">15953</text>
+  <text x="207" y="239" class="axis-tick" text-anchor="middle">15613</text>
+  <text x="294" y="148" class="axis-tick" text-anchor="middle">15901</text>
+  <text x="381" y="75"  class="axis-tick" text-anchor="middle">16133</text>
+  <text x="468" y="153" class="axis-tick" text-anchor="middle">15884</text>
+  <text x="555" y="156" class="axis-tick" text-anchor="middle">15875</text>
+  <text x="642" y="192" class="axis-tick" text-anchor="middle">15762</text>
+  <text x="729" y="87"  class="axis-tick" text-anchor="middle">16096</text>
+  <g class="axis-tick">
+    <text transform="translate(120,294) rotate(-30)">baseline</text>
+    <text transform="translate(207,294) rotate(-30)">baseline-alt</text>
+    <text transform="translate(294,294) rotate(-30)">md-raid0</text>
+    <text transform="translate(381,294) rotate(-30)">md-raid1</text>
+    <text transform="translate(468,294) rotate(-30)">ublk-r0-hw1</text>
+    <text transform="translate(555,294) rotate(-30)">ublk-r0-hw4</text>
+    <text transform="translate(642,294) rotate(-30)">ublk-r1-hw1</text>
+    <text transform="translate(729,294) rotate(-30)">ublk-r1-hw4</text>
+  </g>
+</svg>
