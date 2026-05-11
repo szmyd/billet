@@ -1,0 +1,96 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: billet-sds-tess92
+  namespace: sds-tess92-17
+  labels:
+    app: billet
+    application.tess.io/name: sdsapp
+    applicationinstance.tess.io/name: sdsapp
+    environment.tess.io/name: pre-production
+  annotations:
+    application.tess.io/name: sdsapp
+    applicationinstance.tess.io/name: sdsapp
+    environment.tess.io/name: pre-production
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app: billet
+        scenario: baseline
+        application.tess.io/name: sdsapp
+        applicationinstance.tess.io/name: sdsapp
+        environment.tess.io/name: pre-production
+      annotations:
+        application.tess.io/name: sdsapp
+        applicationinstance.tess.io/name: sdsapp
+        environment.tess.io/name: pre-production
+        io.sherlock.logs/namespace: sds
+        io.sherlock.metrics/module: prometheus
+        io.sherlock.metrics/hosts: "${data.host}:9777/metrics"
+        io.sherlock.metrics/namespace: sds
+        io.sherlock.metrics/period: 60s
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: billet
+        image: hub.tess.io/sds/billet:latest
+        imagePullPolicy: Always
+        command: ["/bin/bash", "-c", "/usr/local/bin/billet-runner.sh 2>&1; exit $?"]
+        env:
+        - name: DEVICE_PATH
+          value: /dev/billet-target
+        - name: DEVICE_LABEL
+          value: sds-tess92
+        - name: TARGET_PVC
+          value: billet-block-pvc
+        - name: DURATION_S
+          value: "120"
+        - name: QD
+          value: "32"
+        - name: METRICS_PORT
+          value: "9777"
+        - name: METRICS_DRAIN_S
+          value: "30"
+        - name: OUTPUT_DIR
+          value: /output
+        - name: JOB_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['job-name']
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        ports:
+        - name: metrics
+          containerPort: 9777
+        resources:
+          requests:
+            cpu: "2"
+            memory: "1Gi"
+          limits:
+            cpu: "2"
+            memory: "2Gi"
+        volumeDevices:
+        - name: target
+          devicePath: /dev/billet-target
+        volumeMounts:
+        - name: output
+          mountPath: /output
+      volumes:
+      - name: target
+        persistentVolumeClaim:
+          claimName: billet-block-pvc
+      - name: output
+        emptyDir: {}

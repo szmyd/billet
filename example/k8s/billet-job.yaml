@@ -1,25 +1,35 @@
-# A billet test run as a Kubernetes Job. The pod binds a block-mode
-# PVC at /dev/billet-target, runs the scripted profile series via the
-# image's entrypoint (example/k8s/entrypoint.sh baked in at build
-# time), and lands an output archive in its emptyDir for kubectl cp.
+# A billet test run as a Kubernetes Job on Tess.
+# The pod binds a block-mode PVC at /dev/billet-target, runs the scripted
+# profile series via the image's entrypoint (example/k8s/entrypoint.sh
+# baked in at build time), and lands an output archive in its emptyDir
+# for kubectl cp.
 #
 # Per-scenario adjustments to copy + edit:
 #   metadata.name                                        -- per-scenario unique (e.g. billet-md-raid0)
+#   metadata.namespace                                   -- your Tess namespace (appname-env)
+#   metadata.labels/annotations (tess.io/*)              -- your Application / ApplicationInstance / Environment
 #   spec.template.metadata.labels.scenario
 #   spec.template.spec.volumes[target].persistentVolumeClaim.claimName
 #   env.DEVICE_LABEL                                     -- legend / entity prefix
 #   env.TARGET_PVC                                       -- same PVC name as above, recorded for audit
-#   spec.template.spec.containers[0].image               -- your registry tag
+#   spec.template.spec.containers[0].image               -- hub.tess.io/<your-org>/billet:<tag>
 #
-# Prometheus annotation form below assumes annotation-based scrape
-# (vanilla prom or kube-prometheus-stack with annotation discovery).
-# For Elastic Metricbeat or prometheus-operator, see example/k8s/README.md.
+# Metrics are scraped by Sherlock (io.sherlock.metrics/* annotations).
+# Adjust io.sherlock.metrics/namespace to your Sherlock metric namespace.
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: billet-baseline
+  namespace: billet-dev                   # <-- your Tess namespace (appname-env)
   labels:
     app: billet
+    application.tess.io/name: billet
+    applicationinstance.tess.io/name: billet-ai       # <-- your ApplicationInstance name
+    environment.tess.io/name: dev                     # dev | feature | staging | pre-production | production
+  annotations:
+    application.tess.io/name: billet
+    applicationinstance.tess.io/name: billet-ai
+    environment.tess.io/name: dev
 spec:
   backoffLimit: 0
   ttlSecondsAfterFinished: 86400      # 24 h to collect, then GC
@@ -28,23 +38,24 @@ spec:
       labels:
         app: billet
         scenario: baseline
+        application.tess.io/name: billet
+        applicationinstance.tess.io/name: billet-ai
+        environment.tess.io/name: dev
       annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "9777"
-        prometheus.io/path: "/metrics"
-        # Alternate: Elastic Metricbeat / autodiscover (uncomment if
-        # the cluster uses Beats-style scraping instead of prometheus
-        # annotations):
-        # co.elastic.metrics/module: prometheus
-        # co.elastic.metrics/hosts: '${data.host}:9777'
-        # co.elastic.metrics/metrics_path: /metrics
-        # co.elastic.metrics/period: 10s
+        application.tess.io/name: billet
+        applicationinstance.tess.io/name: billet-ai
+        environment.tess.io/name: dev
+        io.sherlock.logs/namespace: billet
+        io.sherlock.metrics/module: prometheus
+        io.sherlock.metrics/hosts: "${data.host}:9777/metrics"
+        io.sherlock.metrics/namespace: billet          # <-- your Sherlock metric namespace
+        io.sherlock.metrics/period: 60s
     spec:
       restartPolicy: Never
       containers:
       - name: billet
-        image: your-registry.example.com/billet:latest
-        imagePullPolicy: IfNotPresent
+        image: hub.tess.io/sds/billet:latest    # <-- your hub.tess.io org and tag
+        imagePullPolicy: Always
         # ENTRYPOINT is /usr/local/bin/billet-runner.sh (baked from
         # example/k8s/entrypoint.sh by the image build).
         env:

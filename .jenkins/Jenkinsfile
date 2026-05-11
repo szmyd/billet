@@ -1,0 +1,151 @@
+pipeline {
+    agent { label 'sds-builder-v8' }
+
+    environment {
+        PROJECT = 'billet'
+        ORG = 'sds'
+        ARTIFACTORY_PASS = credentials('ARTIFACTORY_PASS')
+        HUB_URL = 'hub.tess.io'
+        DEV_BRANCH = 'main'
+        STABLE_BRANCH = 'stable/*'
+        REL_TARGET = '1.0'
+    }
+
+    stages {
+        stage('Inspect') {
+            steps {
+                script {
+                    COMMIT_SHA = sh(script: "echo ${GIT_COMMIT} | cut -c1-7 | tr -d '\n' | tr -d '\"'", returnStdout: true)
+                    VER = sh(script: "grep -m 1 'version =' conanfile.py | awk '{print \$3}' | tr -d '\n' | tr -d '\"'", returnStdout: true)
+                    SANITIZE_BRANCH = sh(script: "echo ${BRANCH_NAME} | sed -E 's,(\\w+-?\\d*)/.*,\\1,' | sed -E 's,-,_,' | tr -d '\n'", returnStdout: true)
+                    TAG = "${VER}-${SANITIZE_BRANCH}"
+                    HUB_PATH = "${HUB_URL}/${ORG}/${PROJECT}"
+                }
+            }
+        }
+
+        stage('Tag Stable Build') {
+            when { anyOf {
+                branch "${STABLE_BRANCH}"
+                branch "${DEV_BRANCH}"
+            } }
+            steps {
+                script {
+                    TAG = "${VER}"
+                }
+            }
+        }
+
+        stage('Announce Build') {
+            steps {
+                script {
+                    slackSend color: '#00D163', channel: '#sds-ci', message: "*${PROJECT}:${TAG}* is building."
+                }
+            }
+        }
+
+        stage('Build') {
+            failFast true
+            matrix {
+                agent { label 'sds-builder-v8' }
+                // billet's conanfile exposes `sanitize` as enum
+                // (address/thread/False) rather than bool. Run a
+                // RelWithDebInfo + sanitize=False as the production
+                // shape, Debug + sanitize=False as the dev shape,
+                // and Debug + sanitize=address as the ASan canary.
+                // Skip thread sanitizer for now (no current
+                // multi-threaded hot path; revisit when multi-worker
+                // lands).
+                axes {
+                    axis {
+                        name 'BUILD_TYPE'
+                        values 'Debug', 'RelWithDebInfo'
+                    }
+                    axis {
+                        name 'SANITIZE'
+                        values 'False', 'address'
+                    }
+                }
+                excludes {
+                    // Sanitizers are Debug-only; sanitize+RelWithDebInfo
+                    // is unsupported by the conanfile's validate().
+                    exclude {
+                        axis {
+                            name 'SANITIZE'
+                            values 'address'
+                        }
+                        axis {
+                            name 'BUILD_TYPE'
+                            values 'RelWithDebInfo'
+                        }
+                    }
+                }
+
+                stages {
+                    stage("Build") {
+                        steps {
+                            script {
+                                def BUILD_OPTIONS = "-o ${PROJECT}/*:sanitize=${SANITIZE} -o sisl/*:prerelease=False -s:h build_type=${BUILD_TYPE}"
+                                sh "conan create -s compiler.cppstd=23 --build missing ${BUILD_OPTIONS} ."
+                                // Stage build artefacts into .jenkins/ for the
+                                // Dockerfile to consume. Source of truth for
+                                // billet-runner.sh is example/k8s/entrypoint.sh;
+                                // copy here so .jenkins/Dockerfile can use a
+                                // .jenkins/-relative build context.
+                                sh "find ~/.conan2/p/b/ -name 'billet' -type f -executable -exec mv {} .jenkins/billet \\;"
+                                sh "cp example/k8s/entrypoint.sh .jenkins/billet-runner.sh"
+                                sh "chmod +x .jenkins/billet-runner.sh"
+                                sh "find ~/.conan2/p -name dump_syms -exec cp {} .jenkins/dump_syms \\;"
+                                sh "find ~/.conan2/p -name minidump_stackwalk -exec cp {} .jenkins/minidump_stackwalk \\;"
+                                sh ".jenkins/dump_syms .jenkins/billet > .jenkins/billet.sym"
+                            }
+                        }
+                    }
+                    stage("Deploy Runnable") {
+                        when {
+                            allOf {
+                                expression { !(env.BRANCH_NAME =~ /PR-/) }
+                                expression { "${SANITIZE}" == 'False' }
+                            }
+                        }
+                        steps {
+                            script {
+                                slackSend color: '#F3AD03', channel: '#sds-ci', message: "*${PROJECT}:${TAG}-${BUILD_TYPE}* is being deployed to Tess.IO"
+                                sh "conan remote login -p ${ARTIFACTORY_PASS} ebay-local _service_sds"
+                                sh "conan graph info ./ | grep 'ref: ' | awk '{print \$2}'  | sort | uniq | grep -v ${PROJECT} | grep -v '#' | while read pkg; do conan upload -r ebay-local -c \"\${pkg}\"; done"
+
+                                def PACKAGE_VERSIONS = [:]
+                                def CONAN_OUTPUT = sh(script: "conan graph info ./ | grep 'ref: ' | awk '{print \$2}' | grep -v '#' | grep -E 'sisl|liburing|hdrhistogram-c'", returnStdout: true).trim()
+                                CONAN_OUTPUT.split('\n').each { pkg ->
+                                    def PACKAGE_NAME = pkg.split('/')[0]
+                                    PACKAGE_VERSIONS[PACKAGE_NAME] = pkg
+                                }
+                                def BILLET_COMMIT_ID = sh(script: "git log -1 --format='%H'", returnStdout: true).trim()
+
+                                withDockerRegistry([credentialsId: 'sds-sds', url: "https://${HUB_URL}"]) {
+                                    sh "docker build \
+                                        --build-arg SislVer=${PACKAGE_VERSIONS['sisl']} \
+                                        --build-arg LiburingVer=${PACKAGE_VERSIONS['liburing']} \
+                                        --build-arg HdrHistogramVer=${PACKAGE_VERSIONS['hdrhistogram-c']} \
+                                        --build-arg BilletCommitId=${BILLET_COMMIT_ID} \
+                                        -t ${HUB_PATH}:${TAG}-${BUILD_TYPE} .jenkins"
+                                    sh "docker push ${HUB_PATH}:${TAG}-${BUILD_TYPE}"
+                                }
+                                slackSend color: '#F3AD03', channel: '#sds-ci', message: "*${PROJECT}:${TAG}-${BUILD_TYPE}* has been pushed to Tess.IO"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        failure {
+            slackSend color: '#E43237', channel: '#sds-ci', message: "*${PROJECT}:${TAG}* had a failure : ${BUILD_URL}"
+        }
+        success {
+            slackSend color: '#85B717', channel: '#sds-ci', message: "*${PROJECT}:${TAG}* has completed successfully."
+        }
+    }
+}

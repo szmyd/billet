@@ -77,7 +77,85 @@ who can deliver more IOPS. It is about what each storage path costs in
 latency to deliver the same fixed app-shaped pressure.
 
 Same exact parameters across all eight runs (recorded in each JSON's
-`profile.params`).
+`profile.params`). They match billet's profile defaults: out-of-the-box
+the postgresql profile approximates a moderate-load OLTP system. Holding
+them constant across configurations means the only variable is the
+storage path.
+
+## Why these parameters?
+
+What each knob means, in PostgreSQL terms, and why the value we picked.
+
+### Reader emitters (`reader.Read`)
+
+- **`--pg-readers 4`, `--pg-reader-iops 2000`** -- 4 backend-process
+  emitters, each issuing 2k 8 KiB reads/s, for 8k reads/s = 64 MiB/s
+  total. Models a small-to-medium OLTP app where several backends
+  concurrently serve buffer fetches. Arrivals are open-loop Poisson:
+  reads schedule independently of completions, so the recorded latency
+  includes queueing, not just per-op service time. That matches a busy
+  DB where new queries don't wait politely for old ones.
+- **`--pg-hot-set-frac 0.10`, `--pg-locality 0.85`** -- 10% of the device
+  is the "hot zone"; 85% of reads land in it, the other 15% are uniform
+  across the cold 90%. Loosely models PG's `shared_buffers` + OS-cache
+  locality, where a small fraction of pages absorb most reads. Picked
+  to exercise the SSD's read path meaningfully: too uniform and you
+  measure the controller's worst case, too concentrated and you measure
+  RAM.
+
+### Random data-file writer (`rand_writer.Write`)
+
+- **`--pg-writers 2`, `--pg-writer-iops 500`** -- 2 emitters x 500 IOPS
+  = 1k random 8 KiB writes/s = 8 MiB/s. Models the `bgwriter` plus a
+  small amount of backend-issued dirty-page eviction. Lower rate than
+  reads because in PG most write traffic is amortized via WAL +
+  checkpoint, not direct random data-file writes.
+
+### WAL emitter (`wal.Write`, `wal.Fsync`)
+
+- **`--pg-wal-mb-per-sec 50`** -- 50 MiB/s of sequential 8 KiB WAL
+  appends (~6.4k ops/s). Mid-range sustained OLTP figure; real systems
+  burst higher but 50 MiB/s sustained is non-trivial. The point is the
+  *shape*: sequential, contrasting with the random writer above.
+- **`--pg-wal-fsync-ms 200`** -- Drain in-flight WAL writes, then issue
+  a device flush, every 200 ms (~5/s). Stand-in for periodic group
+  commit, since this profile has no LSN or commit-waiter model. The
+  resulting `wal.Fsync` latency is "drain + flush", which is the
+  drain-and-flush *component* of PG commit cost (not a full commit
+  latency a DBA would quote).
+
+### Checkpoint writer (`ckpt.Write`)
+
+- **`--pg-ckpt-period-ms 5000`, `--pg-ckpt-burst-mb 256`** -- Every 5 s,
+  dump 256 MiB of dirty buffers as 64 KiB writes. Averages ~51 MiB/s
+  but is deliberately *bursty*. Real PG spreads checkpoints over
+  `checkpoint_completion_target * checkpoint_timeout`; this is closer
+  to an aggressive short-target checkpoint. The bursty shape is the
+  point: it lets you see whether the stack tolerates a write storm
+  while reads continue.
+
+### Engine knobs
+
+- **`--qd 32`** -- Global device-op cap (closed-loop). Each emitter
+  holds at most one in-flight op, so the qd-32 budget is shared
+  dynamically across all five cells. 32 is a typical `iostat` queue
+  depth on a busy NVMe.
+- **`--workers 1`** -- Engine constraint: billet currently runs
+  single-worker, pinned to CPU 0. For a comparison run that's a
+  feature; it removes cross-CPU variance as a confound.
+- **`--duration 120`** -- Enough to capture at least 24 checkpoint
+  cycles and ~600 WAL fsyncs so percentile distributions stabilize,
+  while staying practical to repeat across all eight scenarios.
+
+### Bottom line
+
+These defaults paint a moderate, mixed-pressure OLTP picture: enough
+read concurrency to exercise queueing, enough write activity that WAL +
+checkpoint matter, hot-set locality that mirrors real cache behavior.
+Tuning them to a specific deployment (write-heavy analytics ingest,
+read-mostly cache-friendly app, etc.) is the natural next step beyond
+stack comparison; for that, change the knobs, re-run, and label the
+runs accordingly.
 
 ## The targets
 

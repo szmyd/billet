@@ -9,3 +9,5 @@ compile_commands.json
 logs/
 
 tools/__pycache__
+
+.DS_Store

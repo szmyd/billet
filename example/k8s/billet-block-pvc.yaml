@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    volume.beta.kubernetes.io/storage-class: sds-tess92-17-raid10
+    volume.sds.ebay.com/pool: test-pool
+  name: billet-block-pvc
+  namespace: sds-tess92-17
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 600Gi
+  volumeMode: Block

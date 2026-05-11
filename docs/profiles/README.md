@@ -54,3 +54,7 @@ Workflow diagrams:
 
 - [random_read_4k workflow](random_read_4k.md#flow-diagram)
 - [postgresql workflow](postgresql.md#workflow-state-diagram)
+
+Adding a profile:
+
+- [adding-a-profile](adding-a-profile.md)
