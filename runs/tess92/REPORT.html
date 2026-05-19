@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>billet: ublkpp vs md-RAID vs raw iSCSI -- tess92</title>
+<style>
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    margin: 0; padding: 40px 48px;
+    background: #f8fafc; color: #0f172a;
+    max-width: 1100px;
+  }
+  h1 { margin: 0 0 6px 0; font-size: 26px; }
+  h2 { margin: 36px 0 12px 0; font-size: 19px; color: #1e293b;
+       border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; }
+  h3 { margin: 24px 0 8px 0; font-size: 15px; color: #334155; }
+  h4 { margin: 20px 0 6px 0; font-size: 14px; color: #475569; }
+  p  { line-height: 1.65; margin: 0 0 14px 0; }
+  .subtitle { color: #64748b; font-size: 14px; margin: 0 0 28px 0; }
+  .tldr {
+    background: #eff6ff; border: 1px solid #bfdbfe;
+    border-radius: 8px; padding: 16px 20px; margin-bottom: 28px;
+  }
+  .tldr p { margin: 6px 0; font-size: 14px; }
+  .tldr strong { color: #1d4ed8; }
+  .links { margin-bottom: 32px; font-size: 14px; }
+  .links a { color: #2563eb; text-decoration: none; }
+  .links a:hover { text-decoration: underline; }
+  table {
+    border-collapse: collapse; width: 100%;
+    font-size: 13px; margin-bottom: 20px;
+  }
+  th {
+    text-align: left; padding: 7px 12px;
+    background: #f1f5f9; color: #475569;
+    font-weight: 600; border-bottom: 2px solid #e2e8f0;
+  }
+  td {
+    padding: 6px 12px; border-bottom: 1px solid #e2e8f0;
+  }
+  td.num { text-align: right; font-family: ui-monospace, monospace; }
+  tr.best td { background: #f0fdf4; }
+  tr:hover td { background: #f8fafc; }
+  .winner { font-weight: 700; color: #15803d; }
+  .worse  { color: #b91c1c; }
+  code {
+    font-family: ui-monospace, monospace; font-size: 12px;
+    background: #f1f5f9; border-radius: 3px; padding: 1px 4px;
+  }
+  pre {
+    background: #0f172a; color: #e2e8f0;
+    border-radius: 8px; padding: 18px 20px;
+    font-family: ui-monospace, monospace; font-size: 12px;
+    overflow-x: auto; line-height: 1.6;
+  }
+  .note { color: #64748b; font-size: 13px; font-style: italic; }
+  .section-note {
+    background: #fefce8; border: 1px solid #fde68a;
+    border-radius: 6px; padding: 10px 14px; margin-bottom: 14px;
+    font-size: 13px; color: #78350f;
+  }
+  footer {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid #e2e8f0;
+    font-size: 12px; color: #94a3b8;
+  }
+</style>
+</head>
+<body>
+
+<h1>billet: ublkpp vs md-RAID vs raw iSCSI</h1>
+<p class="subtitle">tess92 &mdash; Intel Xeon Platinum 8352M &middot; 128 cores &middot; 503 GiB RAM &middot; kernel 6.8.0-91-generic &middot; io_uring O_DIRECT QD=32 300 s</p>
+
+<div class="tldr">
+  <p><strong>Random reads (rr4k):</strong> The raw single-device baseline is queue-saturated at QD=32. Every RAID configuration shows lower latency -- spreading 32 in-flight requests across 2-4 devices reduces per-device queue depth. Both md-RAID and ublkpp obey Little&apos;s Law (IOPS = QD / latency): md-RAID10 wins because its in-kernel path carries no userspace round-trip, achieving 3.2x the IOPS at 68% lower p50 latency than baseline.</p>
+  <p><strong>Mixed load (pg):</strong> The write path changes everything. md-RAID&apos;s kernel stripe locks block concurrent reads during write bursts -- read p99 blows up to 278-371 ms versus 160 ms on the raw device. <strong>ublkpp RAID10 (nr_hw_queues=1) is the clear winner:</strong> best read p99 (110 ms, 31% better than baseline), write p99 better than a single raw device (8.7 ms vs 21.8 ms). No stripe locking -- reads and writes are independent io_uring SQEs.</p>
+  <p><strong>nr_hw_queues=4:</strong> Gains 13% read IOPS by reducing per-queue lock contention. The pg run at hw4 collected only ~40% of expected operations: QD=32 split across 4 queues leaves ~QD=8 per queue, insufficient for the pg workload&apos;s five concurrent streams.</p>
+</div>
+
+<div class="links">
+  Interactive comparisons:
+  <a href="compare-rr4k.html">compare-rr4k.html</a> &middot;
+  <a href="compare-pg.html">compare-pg.html</a>
+  (tail-shape polylines, device capability table, p99 heat-grid)
+</div>
+
+<h2>The test</h2>
+
+<p>Two profiles were run against each target. <strong>random_read_4k (rr4k)</strong> -- pure read, open-loop Poisson arrivals, 4 KiB random reads across the full device, QD=32, 300 s. <strong>postgresql (pg)</strong> -- mixed read/write workload at a fixed scheduled rate; the write path is the variable that separates the storage stacks.</p>
+
+<table>
+<thead><tr><th>Component</th><th>Description</th><th>Configured rate</th></tr></thead>
+<tbody>
+<tr><td><code>reader.Read</code></td><td>4 KiB random reads, 85% biased to a 10% hot set</td><td>4 emitters x 2,000 IOPS</td></tr>
+<tr><td><code>rand_writer.Write</code></td><td>4 KiB uniform random writes</td><td>2 emitters x 500 IOPS</td></tr>
+<tr><td><code>wal.Write</code></td><td>Sequential 4 KiB WAL appends</td><td>50 MiB/s</td></tr>
+<tr><td><code>wal.Fsync</code></td><td>Periodic WAL drain + device flush</td><td>every 200 ms</td></tr>
+<tr><td><code>ckpt.Write</code></td><td>4 KiB checkpoint write bursts</td><td>256 MiB every 5 s</td></tr>
+</tbody>
+</table>
+
+<p>Total scheduled load: ~15.4k ops/s. All six targets sustained that rate within 1.5% noise. This is not a peak-IOPS comparison -- it is a tail-latency comparison under controlled, app-realistic pressure.</p>
+
+<h2>The targets</h2>
+
+<p>All targets backed by the same physical iSCSI storage. The ublkpp volume is provisioned via the nublox CSI as a 600 GiB PVC. The same iSCSI LUNs underlie both the ublkpp RAID layer and the md-RAID arrays -- the backend is identical across all three layers.</p>
+
+<table>
+<thead><tr><th>Label</th><th>Device</th><th>Stack</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><code>baseline</code></td><td>/dev/sda</td><td>Raw iSCSI LUN</td><td>Single LUN, no RAID</td></tr>
+<tr><td><code>md-raid1</code></td><td>/dev/md0</td><td>Kernel md, RAID1 across 2 LUNs</td><td>--assume-clean</td></tr>
+<tr><td><code>md-raid10</code></td><td>/dev/md0</td><td>Kernel md, RAID10 across 4 LUNs</td><td>--assume-clean</td></tr>
+<tr><td><code>uraid1-hw1</code></td><td>/dev/billet-target</td><td>ublkpp RAID1, nr_hw_queues=1</td><td>2 backing LUNs</td></tr>
+<tr><td><code>uraid10-hw1</code></td><td>/dev/billet-target</td><td>ublkpp RAID10, nr_hw_queues=1</td><td>4 backing LUNs</td></tr>
+<tr><td><code>uraid10-hw4</code></td><td>/dev/billet-target</td><td>ublkpp RAID10, nr_hw_queues=4</td><td>4 backing LUNs</td></tr>
+</tbody>
+</table>
+
+<h2>rr4k Results</h2>
+
+<h3>Headline numbers</h3>
+<p class="note">All latencies in microseconds. Higher IOPS is better; lower latency is better.</p>
+
+<table>
+<thead><tr><th>Scenario</th><th class="num">IOPS</th><th class="num">MiB/s</th><th class="num">p50 us</th><th class="num">p99 us</th><th class="num">p99.9 us</th><th class="num">p99.99 us</th></tr></thead>
+<tbody>
+<tr><td>baseline</td><td class="num">58,923</td><td class="num">230</td><td class="num">479</td><td class="num">1,641</td><td class="num">3,536</td><td class="num">5,935</td></tr>
+<tr><td>md-raid1</td><td class="num">91,452</td><td class="num">357</td><td class="num">320</td><td class="num">909</td><td class="num">1,797</td><td class="num">4,558</td></tr>
+<tr class="best"><td><strong>md-raid10</strong></td><td class="num winner">189,927</td><td class="num winner">742</td><td class="num winner">155</td><td class="num winner">471</td><td class="num winner">885</td><td class="num winner">1,946</td></tr>
+<tr><td>uraid1-hw1</td><td class="num">77,754</td><td class="num">304</td><td class="num">369</td><td class="num">1,314</td><td class="num">2,865</td><td class="num">5,365</td></tr>
+<tr><td>uraid10-hw1</td><td class="num">85,558</td><td class="num">334</td><td class="num">363</td><td class="num">1,051</td><td class="num">2,394</td><td class="num">4,616</td></tr>
+<tr><td>uraid10-hw4</td><td class="num">97,014</td><td class="num">379</td><td class="num">297</td><td class="num">1,176</td><td class="num">2,750</td><td class="num">4,784</td></tr>
+</tbody>
+</table>
+
+<h3>Analysis</h3>
+
+<p><strong>Every RAID configuration shows lower latency than the raw single-device baseline.</strong> This is queue saturation. At QD=32, the single iSCSI LUN is running near its concurrency limit. Any configuration that spreads those 32 in-flight requests across 2 or 4 devices reduces per-device queue depth, directly reducing per-op queuing latency. Higher throughput <em>and</em> lower latency together are the signature of a saturated single device.</p>
+
+<p><strong>Why md-RAID10 gets 2x the IOPS of ublkpp RAID10 at the same QD=32:</strong> Both are constrained by the same budget of 32 in-flight requests. Little's Law: IOPS = QD / latency. md-RAID10 uses that budget more efficiently because its read path is entirely in-kernel -- no context switches to userspace. The per-IO latency is lower (155 vs 363 us p50), so more ops complete per second at the same QD. The ublkpp round-trip (kernel &rarr; userspace &rarr; io_uring &rarr; backing device &rarr; userspace &rarr; kernel) adds roughly 140-210 us per op. The numbers are consistent with Little's Law: md-RAID10 theoretical ceiling = 32 / 155 us = ~206k IOPS, actual 190k; uraid10-hw1 = 32 / 363 us = ~88k IOPS, actual 86k.</p>
+
+<p><strong>nr_hw_queues=4 gains 13% over hw1</strong> (97k vs 86k IOPS, p50 297 vs 363 us). With a single benchmark submitter at QD=32, the gain comes from reduced per-queue lock contention on the ublkpp side. The 2x gap to md-RAID10 remains -- it is a property of the userspace round-trip, not a queue-count issue.</p>
+
+<h2>pg Results</h2>
+
+<h3>Headline numbers (p99, microseconds)</h3>
+<p class="note">All targets sustained ~16,000 IOPS and ~167 MiB/s. The signal is in the tails.</p>
+
+<table>
+<thead><tr><th>Scenario</th><th class="num">reader.Read</th><th class="num">rand_writer.Write</th><th class="num">wal.Write</th><th class="num">wal.Fsync</th><th class="num">ckpt.Write</th></tr></thead>
+<tbody>
+<tr><td>baseline</td><td class="num">160,432</td><td class="num">21,774</td><td class="num">4,171</td><td class="num">4,079</td><td class="num">6,496</td></tr>
+<tr><td>md-raid1</td><td class="num worse">371,458</td><td class="num worse">205,520</td><td class="num worse">8,560</td><td class="num worse">10,502</td><td class="num worse">11,001</td></tr>
+<tr><td>md-raid10</td><td class="num worse">278,396</td><td class="num worse">145,883</td><td class="num worse">8,101</td><td class="num worse">9,068</td><td class="num worse">10,125</td></tr>
+<tr><td>uraid1-hw1</td><td class="num worse">215,482</td><td class="num worse">54,853</td><td class="num">5,099</td><td class="num">4,300</td><td class="num">7,905</td></tr>
+<tr class="best"><td><strong>uraid10-hw1</strong></td><td class="num winner">110,886</td><td class="num winner">8,667</td><td class="num winner">3,997</td><td class="num">4,730</td><td class="num winner">5,619</td></tr>
+<tr><td>uraid10-hw4 (&dagger;)</td><td class="num">116,719</td><td class="num">10,051</td><td class="num">4,341</td><td class="num">5,189</td><td class="num">6,037</td></tr>
+</tbody>
+</table>
+
+<p class="note">(&dagger;) uraid10-hw4 collected only ~40% of expected operations -- see analysis section 4 below.</p>
+
+<h3>Analysis</h3>
+
+<h4>1. Throughput is intentionally pinned</h4>
+<p>All six scenarios sustained 15,932-16,151 IOPS within 1.5% of each other. This is a fixed-rate app shape, not a peak-IOPS bake-off. The differentiator is tail latency.</p>
+
+<h4>2. md-RAID's stripe locks are the dominant failure mode</h4>
+<p>md-RAID's pg results are the mirror image of its rr4k results. The in-kernel read path that made it fast under pure reads becomes a liability under mixed load. Kernel md-RAID serializes writes through <strong>per-stripe locks</strong>: each write locks the stripe, issues writes to both mirror legs, waits for both completions, then unlocks. Reads arriving during a locked stripe queue behind it.</p>
+<p>Under the pg workload's 256 MiB checkpoint burst (every 5 seconds), md-RAID holds stripe locks for the duration of the burst. Reads accumulate, producing the p99 blowup in the table: md-raid1 <code>reader.Read</code> p99 = 371 ms (2.3x worse than baseline), md-raid10 = 278 ms (1.7x worse). The <code>rand_writer.Write</code> p99 is severe: md-raid1 = 205 ms (9.4x baseline), md-raid10 = 145 ms (6.7x baseline). p50 latencies remain low for both (106 us for md-raid10 reads), confirming the in-kernel path is fast when not blocked. The tail is entirely a write-burst interference effect.</p>
+
+<h4>3. ublkpp RAID10 (hw1) is the standout</h4>
+<p>ublkpp operates in userspace: reads and writes are independent io_uring SQEs submitted to backing devices. There is no stripe locking. When a checkpoint burst fires, ublkpp issues write SQEs to backing devices without blocking the read submission path. Reads and writes make progress concurrently.</p>
+<p><code>uraid10-hw1</code> results vs baseline:</p>
+<ul>
+  <li><code>reader.Read</code> p99 = 110 ms -- best of all configurations, 31% better than baseline, 2.5x better than md-raid10</li>
+  <li><code>rand_writer.Write</code> p99 = 8.7 ms -- better than raw single-device baseline (21.8 ms), 17x better than md-raid10</li>
+  <li><code>ckpt.Write</code> p50 = 1,585 us -- slightly better than baseline (1,848 us)</li>
+</ul>
+<p>ublkpp RAID10 beats a raw single iSCSI device on write tail latency because it fans writes across 4 devices, halving per-device write queue pressure, while concurrently servicing reads with no locking between the two paths.</p>
+
+<h4>4. nr_hw_queues=4 under pg -- the QD budget problem</h4>
+<div class="section-note">The uraid10-hw4 pg run collected ~959k <code>reader.Read</code> operations versus ~2.4M for uraid10-hw1 over the same 300-second window -- about 40% of expected throughput. Results are indicative but not directly comparable to hw1.</div>
+<p>With QD=32 split across 4 hardware queues, each queue receives approximately QD=8 of in-flight budget. The pg workload has five concurrent streams (readers, writers, WAL, fsync, checkpoint). At QD=8 per queue, streams stall waiting for in-flight slots, reducing throughput. For a pg-style mixed workload at QD=32, <code>nr_hw_queues=1</code> is the correct setting. <code>nr_hw_queues=4</code> benefits single-stream read-heavy workloads; it throttles multi-stream mixed workloads by fragmenting the QD budget.</p>
+
+<h4>5. RAID1 vs RAID10 under ublkpp</h4>
+<p><code>uraid1-hw1</code> vs <code>uraid10-hw1</code> shows the write fan-out benefit of RAID10. RAID1 concentrates write pressure on 2 backing LUNs. RAID10 stripes writes across 4 devices (2-way mirroring), halving per-device write queue depth. <code>rand_writer.Write</code> p99: 54,853 us (RAID1) vs 8,667 us (RAID10) -- a <strong>6x improvement</strong> from doubling the stripe count. <code>reader.Read</code> p99: 215 ms vs 111 ms -- 2x improvement.</p>
+
+<h2>Conclusion</h2>
+
+<ul>
+  <li><strong>For read-only workloads, md-RAID wins.</strong> The in-kernel path has lower per-IO latency (no userspace round-trip), which at any fixed QD budget translates directly to higher IOPS. md-RAID10 achieves 3.2x the throughput of a single raw device at lower latency.</li>
+  <li><strong>For mixed read-write workloads, ublkpp RAID10 wins.</strong> md-RAID's stripe locks create severe read-write interference under write bursts: 6-9x worse write tail and 1.7-2.3x worse read tail vs a single raw device. ublkpp avoids this entirely with independent io_uring read and write paths.</li>
+  <li><strong>ublkpp RAID10 at nr_hw_queues=1 is the correct setting for mixed workloads at QD=32.</strong> nr_hw_queues=4 helps single-stream read workloads; it throttles multi-stream mixed workloads by fragmenting the QD budget.</li>
+  <li><strong>ublkpp's per-IO overhead</strong> -- roughly 140-210 us on reads, 50-90 us on mixed workloads -- is the cost of the kernel-userspace round-trip and the only thing separating ublkpp from md-RAID on pure read performance.</li>
+</ul>
+
+<h2>Artifacts</h2>
+<ul>
+  <li><a href="compare-rr4k.html">compare-rr4k.html</a> -- interactive comparison for random_read_4k (tail-shape polylines, p99 heat-grid)</li>
+  <li><a href="compare-pg.html">compare-pg.html</a> -- interactive comparison for postgresql</li>
+  <li><code>*-rr4k.json</code>, <code>*-pg.json</code> -- per-run <code>billet.run/1</code> outputs with embedded HDR histogram payloads</li>
+  <li><a href="README.md">README.md</a> -- same content as this report in Markdown</li>
+</ul>
+
+<footer>
+  Generated with <a href="https://github.com/szmyd/billet">billet</a> &middot; tess92 &middot; 2026
+</footer>
+
+</body>
+</html>

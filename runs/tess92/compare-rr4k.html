@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>tess92 random_read_4k: ublkpp vs md-RAID vs raw iSCSI</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 24px;
+          background: #f8fafc; color: #0f172a; }
+  h1 { margin: 0 0 8px 0; }
+  h2 { margin: 28px 0 12px 0; font-size: 18px; color: #334155;
+        border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+  .meta { color: #64748b; font-size: 13px; margin: 0 0 24px 0; }
+  .panel { background: white; padding: 14px 22px; margin-bottom: 18px;
+            border: 1px solid #e2e8f0; border-radius: 8px;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); }
+  table { font-family: ui-monospace, monospace; font-size: 13px;
+           border-collapse: collapse; }
+  th, td { padding: 4px 12px; text-align: left;
+            border-bottom: 1px solid #e2e8f0; }
+  th { font-weight: 600; color: #64748b; }
+  details { margin-top: 24px; }
+  summary { cursor: pointer; color: #475569; font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>tess92 random_read_4k: ublkpp vs md-RAID vs raw iSCSI</h1>
+<p class="meta">6 runs &middot; right-click any chart to save the SVG</p>
+<h2>Headlines</h2>
+<div class="panel"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 316" width="880" height="316" font-family="system-ui, sans-serif" font-size="14">
+<text x="240" y="24" font-weight="600" font-size="17">Aggregate IOPS</text>
+<text x="240" y="44" fill="#64748b" font-size="12">ops/s &middot; higher is better</text>
+<text x="230" y="80.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">baseline</text>
+<rect x="240" y="60" width="158.2" height="30" fill="#2563eb" />
+<text x="406.2" y="80.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">58,923</text>
+<text x="230" y="118.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">md-raid1</text>
+<rect x="240" y="98" width="245.6" height="30" fill="#16a34a" />
+<text x="493.6" y="118.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">91,452</text>
+<text x="230" y="156.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">md-raid10</text>
+<rect x="240" y="136" width="510.0" height="30" fill="#d97706" />
+<text x="758.0" y="156.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">189,927</text>
+<text x="230" y="194.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">uraid1-hw1</text>
+<rect x="240" y="174" width="208.8" height="30" fill="#dc2626" />
+<text x="456.8" y="194.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">77,754</text>
+<text x="230" y="232.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">uraid10-hw1</text>
+<rect x="240" y="212" width="229.7" height="30" fill="#7c3aed" />
+<text x="477.7" y="232.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">85,558</text>
+<text x="230" y="270.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">uraid10-hw4</text>
+<rect x="240" y="250" width="260.5" height="30" fill="#0891b2" />
+<text x="508.5" y="270.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">97,014</text>
+</svg></div>
+<div class="panel"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 316" width="880" height="316" font-family="system-ui, sans-serif" font-size="14">
+<text x="240" y="24" font-weight="600" font-size="17">Throughput</text>
+<text x="240" y="44" fill="#64748b" font-size="12">MiB/s &middot; higher is better</text>
+<text x="230" y="80.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">baseline</text>
+<rect x="240" y="60" width="158.2" height="30" fill="#2563eb" />
+<text x="406.2" y="80.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">230.2</text>
+<text x="230" y="118.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">md-raid1</text>
+<rect x="240" y="98" width="245.6" height="30" fill="#16a34a" />
+<text x="493.6" y="118.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">357.2</text>
+<text x="230" y="156.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">md-raid10</text>
+<rect x="240" y="136" width="510.0" height="30" fill="#d97706" />
+<text x="758.0" y="156.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">741.9</text>
+<text x="230" y="194.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">uraid1-hw1</text>
+<rect x="240" y="174" width="208.8" height="30" fill="#dc2626" />
+<text x="456.8" y="194.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">303.7</text>
+<text x="230" y="232.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">uraid10-hw1</text>
+<rect x="240" y="212" width="229.7" height="30" fill="#7c3aed" />
+<text x="477.7" y="232.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">334.2</text>
+<text x="230" y="270.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">uraid10-hw4</text>
+<rect x="240" y="250" width="260.5" height="30" fill="#0891b2" />
+<text x="508.5" y="270.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">379.0</text>
+</svg></div>
+<div class="panel"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 316" width="880" height="316" font-family="system-ui, sans-serif" font-size="14">
+<text x="240" y="24" font-weight="600" font-size="17">reader.Read p99</text>
+<text x="240" y="44" fill="#64748b" font-size="12">ms &middot; lower is better (log scale)</text>
+<text x="230" y="80.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">baseline</text>
+<rect x="240" y="60" width="510.0" height="30" fill="#2563eb" />
+<text x="758.0" y="80.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">1.64 ms</text>
+<text x="230" y="118.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">md-raid1</text>
+<rect x="240" y="98" width="408.5" height="30" fill="#16a34a" />
+<text x="656.5" y="118.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">909 µs</text>
+<text x="230" y="156.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">md-raid10</text>
+<rect x="240" y="136" width="303.6" height="30" fill="#d97706" />
+<text x="551.6" y="156.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">471 µs</text>
+<text x="230" y="194.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">uraid1-hw1</text>
+<rect x="240" y="174" width="471.2" height="30" fill="#dc2626" />
+<text x="719.2" y="194.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">1.31 ms</text>
+<text x="230" y="232.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">uraid10-hw1</text>
+<rect x="240" y="212" width="432.9" height="30" fill="#7c3aed" />
+<text x="680.9" y="232.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">1.05 ms</text>
+<text x="230" y="270.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">uraid10-hw4</text>
+<rect x="240" y="250" width="452.1" height="30" fill="#0891b2" />
+<text x="700.1" y="270.0" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">1.18 ms</text>
+</svg></div>
+<h2>Tail shape</h2>
+<div class="panel"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 390" width="880" height="390" font-family="system-ui, sans-serif" font-size="14">
+<text x="80" y="24" font-weight="600" font-size="17">reader.Read latency spectrum</text>
+<text x="80" y="44" fill="#64748b" font-size="12">µs &middot; lower is better (log scale)</text>
+<line x1="80" y1="323.5" x2="640" y2="323.5" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="327.5" text-anchor="end" fill="#64748b" font-size="11">100µs</text>
+<line x1="80" y1="241.2" x2="640" y2="241.2" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="245.2" text-anchor="end" fill="#64748b" font-size="11">1.00ms</text>
+<line x1="80" y1="158.8" x2="640" y2="158.8" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="162.8" text-anchor="end" fill="#64748b" font-size="11">10.00ms</text>
+<line x1="80" y1="76.5" x2="640" y2="76.5" stroke="#e2e8f0" stroke-width="1" />
+<text x="72" y="80.5" text-anchor="end" fill="#64748b" font-size="11">100ms</text>
+<line x1="80.0" y1="60" x2="80.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="80.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">p50</text>
+<line x1="220.0" y1="60" x2="220.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="220.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">p99</text>
+<line x1="360.0" y1="60" x2="360.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="360.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">p99.9</text>
+<line x1="500.0" y1="60" x2="500.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="500.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">p99.99</text>
+<line x1="640.0" y1="60" x2="640.0" y2="340" stroke="#f1f5f9" stroke-width="1" />
+<text x="640.0" y="358.0" text-anchor="middle" fill="#64748b" font-size="12">max</text>
+<polyline fill="none" stroke="#2563eb" stroke-width="2" points="80.0,267.5 220.0,223.5 360.0,196.0 500.0,177.5 640.0,145.2" />
+<circle cx="80.0" cy="267.5" r="3.5" fill="#2563eb" />
+<circle cx="220.0" cy="223.5" r="3.5" fill="#2563eb" />
+<circle cx="360.0" cy="196.0" r="3.5" fill="#2563eb" />
+<circle cx="500.0" cy="177.5" r="3.5" fill="#2563eb" />
+<circle cx="640.0" cy="145.2" r="3.5" fill="#2563eb" />
+<polyline fill="none" stroke="#16a34a" stroke-width="2" points="80.0,281.9 220.0,244.6 360.0,220.2 500.0,186.9 640.0,144.6" />
+<circle cx="80.0" cy="281.9" r="3.5" fill="#16a34a" />
+<circle cx="220.0" cy="244.6" r="3.5" fill="#16a34a" />
+<circle cx="360.0" cy="220.2" r="3.5" fill="#16a34a" />
+<circle cx="500.0" cy="186.9" r="3.5" fill="#16a34a" />
+<circle cx="640.0" cy="144.6" r="3.5" fill="#16a34a" />
+<polyline fill="none" stroke="#d97706" stroke-width="2" points="80.0,307.9 220.0,268.1 360.0,245.5 500.0,217.4 640.0,158.7" />
+<circle cx="80.0" cy="307.9" r="3.5" fill="#d97706" />
+<circle cx="220.0" cy="268.1" r="3.5" fill="#d97706" />
+<circle cx="360.0" cy="245.5" r="3.5" fill="#d97706" />
+<circle cx="500.0" cy="217.4" r="3.5" fill="#d97706" />
+<circle cx="640.0" cy="158.7" r="3.5" fill="#d97706" />
+<polyline fill="none" stroke="#dc2626" stroke-width="2" points="80.0,276.8 220.0,231.4 360.0,203.5 500.0,181.1 640.0,151.6" />
+<circle cx="80.0" cy="276.8" r="3.5" fill="#dc2626" />
+<circle cx="220.0" cy="231.4" r="3.5" fill="#dc2626" />
+<circle cx="360.0" cy="203.5" r="3.5" fill="#dc2626" />
+<circle cx="500.0" cy="181.1" r="3.5" fill="#dc2626" />
+<circle cx="640.0" cy="151.6" r="3.5" fill="#dc2626" />
+<polyline fill="none" stroke="#7c3aed" stroke-width="2" points="80.0,277.4 220.0,239.4 360.0,210.0 500.0,186.5 640.0,153.9" />
+<circle cx="80.0" cy="277.4" r="3.5" fill="#7c3aed" />
+<circle cx="220.0" cy="239.4" r="3.5" fill="#7c3aed" />
+<circle cx="360.0" cy="210.0" r="3.5" fill="#7c3aed" />
+<circle cx="500.0" cy="186.5" r="3.5" fill="#7c3aed" />
+<circle cx="640.0" cy="153.9" r="3.5" fill="#7c3aed" />
+<polyline fill="none" stroke="#0891b2" stroke-width="2" points="80.0,284.6 220.0,235.4 360.0,205.0 500.0,185.2 640.0,143.2" />
+<circle cx="80.0" cy="284.6" r="3.5" fill="#0891b2" />
+<circle cx="220.0" cy="235.4" r="3.5" fill="#0891b2" />
+<circle cx="360.0" cy="205.0" r="3.5" fill="#0891b2" />
+<circle cx="500.0" cy="185.2" r="3.5" fill="#0891b2" />
+<circle cx="640.0" cy="143.2" r="3.5" fill="#0891b2" />
+<text x="656" y="72" font-size="12" font-weight="600" fill="#475569">scenarios</text>
+<rect x="656" y="82" width="14" height="3" fill="#2563eb" />
+<text x="676" y="90" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">baseline</text>
+<rect x="656" y="98" width="14" height="3" fill="#16a34a" />
+<text x="676" y="106" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">md-raid1</text>
+<rect x="656" y="114" width="14" height="3" fill="#d97706" />
+<text x="676" y="122" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">md-raid10</text>
+<rect x="656" y="130" width="14" height="3" fill="#dc2626" />
+<text x="676" y="138" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">uraid1-hw1</text>
+<rect x="656" y="146" width="14" height="3" fill="#7c3aed" />
+<text x="676" y="154" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">uraid10-hw1</text>
+<rect x="656" y="162" width="14" height="3" fill="#0891b2" />
+<text x="676" y="170" font-size="11" font-family="ui-monospace, monospace" fill="#0f172a">uraid10-hw4</text>
+</svg></div>
+<h2>Device capabilities</h2>
+<p class="meta">As reported by the kernel at probe time. These are
+advertised device capabilities, not proof that a specific operation path used
+or honored them. billet submits wal.Fsync with fsync; <code>fua</code> only
+says whether the device advertises FUA writes.</p>
+<div class="panel"><table><thead><tr><th>scenario</th><th>fua</th><th>discard</th><th>write_zeroes</th><th>rotational</th><th>logical / physical block</th></tr></thead><tbody><tr><td>baseline</td><td style="color:#b45309">no</td><td style="color:#0f172a">yes</td><td style="color:#0f172a">yes</td><td style="color:#b45309">no</td><td>4096 / 4096</td></tr><tr><td>md-raid1</td><td style="color:#0f172a">yes</td><td style="color:#0f172a">yes</td><td style="color:#b45309">no</td><td style="color:#b45309">no</td><td>4096 / 4096</td></tr><tr><td>md-raid10</td><td style="color:#0f172a">yes</td><td style="color:#0f172a">yes</td><td style="color:#b45309">no</td><td style="color:#b45309">no</td><td>4096 / 4096</td></tr><tr><td>uraid1-hw1</td><td style="color:#0f172a">yes</td><td style="color:#0f172a">yes</td><td style="color:#b45309">no</td><td style="color:#b45309">no</td><td>4096 / 4096</td></tr><tr><td>uraid10-hw1</td><td style="color:#0f172a">yes</td><td style="color:#0f172a">yes</td><td style="color:#b45309">no</td><td style="color:#b45309">no</td><td>4096 / 131072</td></tr><tr><td>uraid10-hw4</td><td style="color:#0f172a">yes</td><td style="color:#0f172a">yes</td><td style="color:#b45309">no</td><td style="color:#b45309">no</td><td>4096 / 131072</td></tr></tbody></table></div>
+<h2>p99 vs reference</h2>
+<div class="panel"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 390 294" width="390" height="294" font-family="system-ui, sans-serif" font-size="14">
+<text x="240" y="24" font-weight="600" font-size="17">p99 latency vs reference</text>
+<text x="240" y="44" fill="#64748b" font-size="12">ratio &middot; lower is better &middot; reference: <tspan font-family="ui-monospace, monospace" fill="#0f172a">baseline</tspan></text>
+<text x="305.0" y="72" text-anchor="middle" font-size="12" font-family="ui-monospace, monospace" fill="#475569">reader.Read</text>
+<text x="230" y="104.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">md-raid1</text>
+<rect x="240.0" y="80.0" width="130" height="38" fill="#c3e7d1" stroke="#e2e8f0" />
+<text x="305.0" y="104.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">0.55x</text>
+<text x="230" y="142.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">md-raid10</text>
+<rect x="240.0" y="118.0" width="130" height="38" fill="#81cd9d" stroke="#e2e8f0" />
+<text x="305.0" y="142.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">0.29x</text>
+<text x="230" y="180.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">uraid1-hw1</text>
+<rect x="240.0" y="156.0" width="130" height="38" fill="#e9f6ee" stroke="#e2e8f0" />
+<text x="305.0" y="180.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">0.80x</text>
+<text x="230" y="218.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">uraid10-hw1</text>
+<rect x="240.0" y="194.0" width="130" height="38" fill="#d2eddc" stroke="#e2e8f0" />
+<text x="305.0" y="218.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">0.64x</text>
+<text x="230" y="256.0" text-anchor="end" font-family="ui-monospace, monospace" font-size="13" fill="#0f172a">uraid10-hw4</text>
+<rect x="240.0" y="232.0" width="130" height="38" fill="#ddf2e5" stroke="#e2e8f0" />
+<text x="305.0" y="256.0" text-anchor="middle" fill="#0f172a" font-size="13" font-family="ui-monospace, monospace">0.72x</text>
+</svg></div>
+<details><summary>sanity: errors &amp; component_drops (zero on clean runs)</summary>
+<table><thead><tr><th>scenario</th><th>errors</th><th>component_drops</th><th></th></tr></thead><tbody><tr><td>baseline</td><td>0</td><td>0</td><td></td></tr><tr><td>md-raid1</td><td>0</td><td>0</td><td></td></tr><tr><td>md-raid10</td><td>0</td><td>0</td><td></td></tr><tr><td>uraid1-hw1</td><td>0</td><td>0</td><td></td></tr><tr><td>uraid10-hw1</td><td>0</td><td>0</td><td></td></tr><tr><td>uraid10-hw4</td><td>0</td><td>0</td><td></td></tr></tbody></table>
+</details>
+</body>
+</html>
