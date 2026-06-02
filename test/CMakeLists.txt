@@ -31,7 +31,7 @@ target_link_libraries(billet_tests PRIVATE
     nlohmann_json::nlohmann_json
     liburing::liburing
     sisl::sisl
-    stdexec
+    stdexec::stdexec
     GTest::gmock
 )
 

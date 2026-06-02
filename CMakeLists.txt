@@ -28,42 +28,10 @@ if (CCACHE_FOUND)
     set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
 endif ()
 
-# stdexec is not yet in Conan; pull it via FetchContent until a real
-# recipe exists. sisl's async headers (sisl/async/...) are header-only
-# and rely on the consumer to provide stdexec + liburing at compile/link time.
-if (POLICY CMP0169)
-    cmake_policy(SET CMP0169 OLD)
-endif ()
-
-include(FetchContent)
-FetchContent_Declare(
-    stdexec
-    GIT_REPOSITORY https://github.com/NVIDIA/stdexec.git
-    GIT_TAG        ea0d8788da51a1671daa00b88bf238725f0844a8 # nvhpc-25.09
-    GIT_SHALLOW    TRUE
-)
-set(STDEXEC_BUILD_TESTS      OFF CACHE BOOL "" FORCE)
-set(STDEXEC_BUILD_EXAMPLES   OFF CACHE BOOL "" FORCE)
-set(STDEXEC_ENABLE_CUDA      OFF CACHE BOOL "" FORCE)
-set(STDEXEC_ENABLE_TBB       OFF CACHE BOOL "" FORCE)
-set(STDEXEC_ENABLE_IO_URING  OFF CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(stdexec)
-
-if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    # stdexec's coroutine machinery materializes anonymous-namespace lambdas
-    # inside its internal coroutine-frame types, which on GCC trips
-    # -Wsubobject-linkage; with billet's -Werror that's a hard fail. The
-    # warning is internal to stdexec's templates (not under our control)
-    # and benign here -- suppress it on every stdexec consumer.
-    target_compile_options(stdexec INTERFACE -Wno-empty-body -Wno-subobject-linkage)
-endif ()
-
-# stdexec's <execution> include drags in libstdc++'s PSTL, which on gcc-15
-# defaults to the TBB backend and emits unresolved tbb::detail::r1::* symbols.
-# We never use std::execution::par, so force the serial backend on every
-# consumer to keep the link clean.
-target_compile_options(stdexec INTERFACE -U_PSTL_PAR_BACKEND_TBB)
-target_compile_definitions(stdexec INTERFACE _PSTL_PAR_BACKEND_SERIAL)
+# stdexec (NVIDIA std::execution) -- provided by the conan package now (sisl ships it transitively;
+# see sisl/3rd_party/stdexec). The stdexec::stdexec target carries the include dirs, the
+# _PSTL_PAR_BACKEND_SERIAL define, and (on gcc) the -Wno-empty-body/-Wno-subobject-linkage flags.
+find_package(stdexec REQUIRED)
 
 include_directories(BEFORE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 

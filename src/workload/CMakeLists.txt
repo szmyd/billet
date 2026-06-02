@@ -15,7 +15,7 @@ target_link_libraries(workload
         # which surfaces stdexec + sisl::async + stats. Liburing comes in
         # via sisl::async. PUBLIC so consumers (engine, cli) see the
         # symbols without re-declaring them.
-        stdexec
+        stdexec::stdexec
         stats
         sisl::sisl
         liburing::liburing

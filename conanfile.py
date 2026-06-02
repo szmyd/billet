@@ -72,7 +72,7 @@ class BilletConan(ConanFile):
 
     def requirements(self):
         # sisl owns metrics + HTTP exposition + option parsing; consumed directly, never mirrored.
-        self.requires("sisl/[^14.1]@oss/dev")
+        self.requires("sisl/[^14.4]@oss/dev")
         self.requires("liburing/[^2.5]")
         self.requires("hdrhistogram-c/[^0.11]")
         self.requires("nlohmann_json/[^3.11]")

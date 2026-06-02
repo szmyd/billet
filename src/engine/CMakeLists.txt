@@ -20,7 +20,7 @@ target_link_libraries(engine
         # so the CLI module sees them transitively when it includes the
         # sender engine header.
         liburing::liburing
-        stdexec
+        stdexec::stdexec
         sisl::sisl
         hdr_histogram::hdr_histogram_static
     PRIVATE
