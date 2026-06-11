@@ -17,6 +17,7 @@
 
 #include <chrono>
 #include <ctime>
+#include <cstdint>
 
 #include <gtest/gtest.h>
 
@@ -29,6 +30,40 @@
 #include <sisl/async/io_uring_scheduler.hpp>
 
 namespace {
+
+// Probe whether IORING_TIMEOUT_ABS works on this kernel/environment.
+// Submits a 10ms absolute timeout, waits 2ms, and checks whether a CQE
+// appeared -- if it did, the timeout fired immediately (broken). Some kernels
+// or container configurations (timens offset, VM clock skew) cause ABS
+// timeouts to treat every target as already-past.
+static bool abs_timeout_works() {
+    ::io_uring ring{};
+    if (0 != ::io_uring_queue_init(4, &ring, 0)) return false;
+
+    struct timespec now_ts{};
+    ::clock_gettime(CLOCK_MONOTONIC, &now_ts);
+    uint64_t const target_ns = static_cast< uint64_t >(now_ts.tv_sec) * 1'000'000'000ULL
+                              + static_cast< uint64_t >(now_ts.tv_nsec) + 10'000'000ULL;
+    __kernel_timespec ts{};
+    ts.tv_sec  = static_cast< __kernel_time64_t >(target_ns / 1'000'000'000ULL);
+    ts.tv_nsec = static_cast< long long >(target_ns % 1'000'000'000ULL);
+
+    ::io_uring_sqe* const sqe = ::io_uring_get_sqe(&ring);
+    ::io_uring_prep_timeout(sqe, &ts, 0, IORING_TIMEOUT_ABS);
+    ::io_uring_sqe_set_data64(sqe, 0);
+
+    __kernel_timespec wait_ts{.tv_sec = 0, .tv_nsec = 2'000'000}; // 2ms wait
+    ::io_uring_cqe* cqe = nullptr;
+    (void)::io_uring_submit_and_wait_timeout(&ring, &cqe, 1, &wait_ts, nullptr);
+
+    ::io_uring_cqe* iter = nullptr;
+    unsigned        head = 0;
+    unsigned        n    = 0;
+    io_uring_for_each_cqe(&ring, head, iter) { ++n; }
+
+    ::io_uring_queue_exit(&ring); // cancels any outstanding requests
+    return 0 == n;                // true = no premature CQE = ABS works
+}
 
 // Sanity: IORING_OP_TIMEOUT itself fires and cqe_state encode/decode work,
 // completely independent of coroutines / stdexec. If the next two tests
@@ -62,18 +97,16 @@ TEST(io_uring_scheduler, raw_timeout_sqe_fires_and_cqe_state_round_trips) {
 }
 
 TEST(io_uring_scheduler, schedule_at_wakes_after_wall_time) {
+    if (!abs_timeout_works()) { GTEST_SKIP() << "IORING_TIMEOUT_ABS fires immediately on this kernel; skipping"; }
+
     ::io_uring ring{};
     ASSERT_EQ(0, ::io_uring_queue_init(8, &ring, 0));
     sisl::async::io_uring_scheduler sched(&ring);
 
-    auto const t0 = std::chrono::steady_clock::now();
-    // Use clock_gettime(CLOCK_MONOTONIC) for target_ns: steady_clock may map
-    // to CLOCK_MONOTONIC_RAW on some toolchains, which diverges from the clock
-    // io_uring uses for IORING_TIMEOUT_ABS.
-    struct timespec now_ts{};
-    ::clock_gettime(CLOCK_MONOTONIC, &now_ts);
-    uint64_t const target_ns = static_cast< uint64_t >(now_ts.tv_sec) * 1'000'000'000ULL
-                              + static_cast< uint64_t >(now_ts.tv_nsec) + 50'000'000ULL;
+    auto const t0     = std::chrono::steady_clock::now();
+    auto const target = t0 + std::chrono::milliseconds{50};
+    uint64_t const target_ns =
+        std::chrono::duration_cast< std::chrono::nanoseconds >(target.time_since_epoch()).count();
 
     bool done = false;
     auto runner = [&]() -> exec::task< void > {

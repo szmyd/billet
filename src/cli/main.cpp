@@ -19,6 +19,7 @@
 #include <report/json_writer.hpp>
 #include <report/run_record.hpp>
 #include <stats/stats.hpp>
+#include <billet/workload/pg_wal_commit.hpp>
 #include <billet/workload/postgresql.hpp>
 #include <billet/workload/random_read_4k.hpp>
 
@@ -27,7 +28,7 @@ SISL_OPTION_GROUP(
     (probe, "", "probe", "Probe a block device and print its geometry, then exit", ::cxxopts::value< std::string >(),
      "<path>"),
     (device, "d", "device", "Block device to benchmark", ::cxxopts::value< std::string >(), "<path>"),
-    (profile, "p", "profile", "Workload profile (random_read_4k | postgresql)",
+    (profile, "p", "profile", "Workload profile (random_read_4k | postgresql | pg_wal_commit)",
      ::cxxopts::value< std::string >()->default_value("random_read_4k"), "<name>"),
     (workers, "w", "workers", "Number of pinned worker threads", ::cxxopts::value< uint32_t >()->default_value("1"),
      ""),
@@ -68,7 +69,11 @@ SISL_OPTION_GROUP(
     (pg_hot_set_frac, "", "pg-hot-set-frac", "(postgresql) Fraction of device that is the read hot set",
      ::cxxopts::value< double >()->default_value("0.10"), ""),
     (pg_locality, "", "pg-locality", "(postgresql) Probability of a read targeting the hot set",
-     ::cxxopts::value< double >()->default_value("0.85"), ""))
+     ::cxxopts::value< double >()->default_value("0.85"), ""),
+    (pgwc_write_size, "", "pgwc-write-size", "(pg_wal_commit) Write size per commit in bytes",
+     ::cxxopts::value< uint32_t >()->default_value("8192"), ""),
+    (pgwc_region_mb, "", "pgwc-region-mb", "(pg_wal_commit) Per-session cycling region in MiB",
+     ::cxxopts::value< uint32_t >()->default_value("64"), ""))
 
 #define ENABLED_OPTIONS logging, billet
 
@@ -88,6 +93,7 @@ profile_descriptor const* lookup_profile(std::string_view name) {
     static constexpr profile_descriptor table[] = {
         {"random_read_4k", false, 4096},
         {"postgresql", true, 65536},
+        {"pg_wal_commit", true, 65536},
     };
     for (auto const& p : table) {
         if (p.name == name) { return &p; }
@@ -98,6 +104,7 @@ profile_descriptor const* lookup_profile(std::string_view name) {
 std::span< billet::workload::component_spec const > profile_components(std::string_view name) {
     if ("random_read_4k" == name) { return billet::workload::random_read_4k_components(); }
     if ("postgresql" == name) { return billet::workload::profiles::postgresql_components(); }
+    if ("pg_wal_commit" == name) { return billet::workload::profiles::pg_wal_commit_components(); }
     return {};
 }
 
@@ -217,6 +224,14 @@ int main(int argc, char* argv[]) {
             builder               = [pg, cfg_qd = cfg.qd](billet::engine::workload_ctx& ctx) -> exec::task< void > {
                 co_await billet::workload::profiles::postgresql_run(ctx, pg, cfg_qd);
             };
+        } else if ("pg_wal_commit" == profile_name) {
+            billet::workload::profiles::pg_wal_commit_config pgwc{};
+            pgwc.device_size_bytes       = dev->size_bytes;
+            pgwc.write_size_bytes        = SISL_OPTIONS["pgwc-write-size"].as< uint32_t >();
+            pgwc.region_per_session_bytes = uint64_t(SISL_OPTIONS["pgwc-region-mb"].as< uint32_t >()) << 20;
+            builder = [pgwc, cfg_qd = cfg.qd](billet::engine::workload_ctx& ctx) -> exec::task< void > {
+                co_await billet::workload::profiles::pg_wal_commit_run(ctx, pgwc, cfg_qd);
+            };
         } else {
             LOGERROR("unknown profile '{}'", profile_name);
             return 1;
@@ -293,6 +308,12 @@ int main(int argc, char* argv[]) {
             if ("random_read_4k" == profile_name) {
                 rec.profile.params["block_size"] = "4096";
                 rec.profile.params["workers"] = std::to_string(worker_count);
+            } else if ("pg_wal_commit" == profile_name) {
+                rec.profile.params["write_size_bytes"] =
+                    std::to_string(SISL_OPTIONS["pgwc-write-size"].as< uint32_t >());
+                rec.profile.params["region_per_session_mb"] =
+                    std::to_string(SISL_OPTIONS["pgwc-region-mb"].as< uint32_t >());
+                rec.profile.params["sessions"] = std::to_string(cfg.qd);
             } else if ("postgresql" == profile_name) {
                 rec.profile.params["readers"] = std::to_string(SISL_OPTIONS["pg-readers"].as< uint32_t >());
                 rec.profile.params["reader_target_iops"] =

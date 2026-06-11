@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.11)
 
 add_library(workload STATIC
+    pg_wal_commit.cpp
     postgresql.cpp
     random_read_4k.cpp
 )
