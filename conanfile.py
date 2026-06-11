@@ -5,7 +5,7 @@ from conan.tools.cmake import CMakeToolchain, CMakeDeps, CMake, cmake_layout
 from conan.tools.files import copy
 from os.path import join
 
-required_conan_version = ">=2.0"
+required_conan_version=">=2.0"
 
 
 class BilletConan(ConanFile):
