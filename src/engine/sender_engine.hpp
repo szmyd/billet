@@ -50,7 +50,7 @@ inline void pin_cpu(int cpu) {
 // The engine calls builder(ctx), spawns the result into an async_scope,
 // and drives poll_once until the task completes.
 //
-// Single worker pinned to CPU 0 (multi-worker is a roadmap item).
+// Single worker pinned to cfg.pin_cpu (multi-worker is a roadmap item).
 // live_stats is fed by submit_op so the CLI's progress bar renders;
 // by_component_cell + component_drops are accumulated via the
 // cell_layout derived from `components`. An optional stats::group
@@ -129,7 +129,7 @@ run(device_info const& dev, run_config const& cfg, std::span< billet::workload::
 
     workload_ctx ctx(sched, pool, fd, deadline_ns, acc, layout, cfg.qd, live, metrics);
 
-    detail::pin_cpu(0);
+    detail::pin_cpu(cfg.pin_cpu);
 
     // Spawn the workload's run task. The builder is captured by reference;
     // it runs once, returns when its internal coroutines drain (typically

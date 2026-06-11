@@ -156,6 +156,8 @@ KNOWN_CELL_ORDER = [
     "wal.Write",
     "wal.Fsync",
     "ckpt.Write",
+    "commit_write.Write",
+    "commit_fsync.Fsync",
 ]
 
 

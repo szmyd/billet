@@ -37,6 +37,7 @@ struct engine_info {
     std::string name;
     uint32_t qd_per_worker{0};
     uint32_t workers{0};
+    uint32_t pin_cpu{0};
     bool sqpoll{false};
     bool o_direct{true};
 };

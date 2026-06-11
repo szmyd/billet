@@ -149,8 +149,8 @@ std::string to_json_string(run_record const& rec) {
     };
 
     j["engine"] = json{
-        {"name", rec.engine.name},     {"qd_per_worker", rec.engine.qd_per_worker}, {"workers", rec.engine.workers},
-        {"sqpoll", rec.engine.sqpoll}, {"o_direct", rec.engine.o_direct},
+        {"name", rec.engine.name}, {"qd_per_worker", rec.engine.qd_per_worker}, {"workers", rec.engine.workers},
+        {"pin_cpu", rec.engine.pin_cpu}, {"sqpoll", rec.engine.sqpoll}, {"o_direct", rec.engine.o_direct},
     };
 
     json by_op = json::object();

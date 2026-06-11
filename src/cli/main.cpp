@@ -32,6 +32,7 @@ SISL_OPTION_GROUP(
      ::cxxopts::value< std::string >()->default_value("random_read_4k"), "<name>"),
     (workers, "w", "workers", "Number of pinned worker threads", ::cxxopts::value< uint32_t >()->default_value("1"),
      ""),
+    (cpu, "", "cpu", "CPU the worker thread is pinned to", ::cxxopts::value< uint32_t >()->default_value("0"), ""),
     (duration, "t", "duration", "Run duration in seconds", ::cxxopts::value< uint32_t >()->default_value("30"), ""),
     (qd, "", "qd", "Queue depth per worker (closed-loop)", ::cxxopts::value< uint32_t >()->default_value("32"), ""),
     (allow_destructive, "", "allow-destructive",
@@ -194,6 +195,7 @@ int main(int argc, char* argv[]) {
         // spec->destructive here keeps the engine's open mode at minimum
         // privilege: read-only profiles open O_RDONLY even after the gate
         // would have approved destructive use.
+        cfg.pin_cpu             = SISL_OPTIONS["cpu"].as< uint32_t >();
         cfg.destructive_allowed = spec->destructive;
 
         auto const started_at = billet::report::iso8601_now();
@@ -340,6 +342,7 @@ int main(int argc, char* argv[]) {
             rec.engine.name = "io_uring";
             rec.engine.qd_per_worker = cfg.qd;
             rec.engine.workers = sum->workers;
+            rec.engine.pin_cpu = cfg.pin_cpu;
             rec.engine.sqpoll = false;
             rec.engine.o_direct = true;
 
