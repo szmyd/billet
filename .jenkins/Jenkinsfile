@@ -79,6 +79,16 @@ pipeline {
                             values 'RelWithDebInfo'
                         }
                     }
+                    exclude {
+                        axis {
+                            name 'SANITIZE'
+                            values 'False'
+                        }
+                        axis {
+                            name 'BUILD_TYPE'
+                            values 'Debug'
+                        }
+                    }
                 }
 
                 stages {
