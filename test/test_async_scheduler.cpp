@@ -16,6 +16,7 @@
 // coroutine flips.
 
 #include <chrono>
+#include <ctime>
 
 #include <gtest/gtest.h>
 
@@ -65,10 +66,14 @@ TEST(io_uring_scheduler, schedule_at_wakes_after_wall_time) {
     ASSERT_EQ(0, ::io_uring_queue_init(8, &ring, 0));
     sisl::async::io_uring_scheduler sched(&ring);
 
-    auto const t0     = std::chrono::steady_clock::now();
-    auto const target = t0 + std::chrono::milliseconds{50};
-    uint64_t const target_ns =
-        std::chrono::duration_cast< std::chrono::nanoseconds >(target.time_since_epoch()).count();
+    auto const t0 = std::chrono::steady_clock::now();
+    // Use clock_gettime(CLOCK_MONOTONIC) for target_ns: steady_clock may map
+    // to CLOCK_MONOTONIC_RAW on some toolchains, which diverges from the clock
+    // io_uring uses for IORING_TIMEOUT_ABS.
+    struct timespec now_ts{};
+    ::clock_gettime(CLOCK_MONOTONIC, &now_ts);
+    uint64_t const target_ns = static_cast< uint64_t >(now_ts.tv_sec) * 1'000'000'000ULL
+                              + static_cast< uint64_t >(now_ts.tv_nsec) + 50'000'000ULL;
 
     bool done = false;
     auto runner = [&]() -> exec::task< void > {
