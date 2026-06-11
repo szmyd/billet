@@ -28,7 +28,7 @@ using hdr_ptr = std::unique_ptr< hdr_histogram, hdr_deleter >;
 // Range/precision constants applied to every HDR billet allocates.
 inline constexpr int64_t k_hdr_lowest_ns = 1;
 inline constexpr int64_t k_hdr_highest_ns =
-    std::chrono::nanoseconds{std::chrono::seconds{60}}.count();
+    std::chrono::nanoseconds{std::chrono::minutes{5}}.count();
 inline constexpr int k_hdr_sigfigs = 3;
 
 // Allocates and initializes an empty histogram. Returns an empty hdr_ptr on

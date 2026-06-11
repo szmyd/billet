@@ -42,8 +42,11 @@ template < typename Ctx >
 exec::task< void > pg_wal_commit_run_impl(Ctx& ctx, pg_wal_commit_config const& cfg, uint32_t sessions) {
     if (0 == sessions || 0 == cfg.device_size_bytes) { co_return; }
 
-    uint64_t const partition = cfg.device_size_bytes / sessions;
-    uint64_t const region    = std::min(cfg.region_per_session_bytes, partition);
+    // Align partition down to write_size_bytes so region_start = partition * i
+    // is always write-size-aligned -- required for O_DIRECT on any block size.
+    uint64_t const raw_partition = cfg.device_size_bytes / sessions;
+    uint64_t const partition     = (raw_partition / cfg.write_size_bytes) * cfg.write_size_bytes;
+    uint64_t const region        = std::min(cfg.region_per_session_bytes, partition);
     if (region < cfg.write_size_bytes) { co_return; }
 
     exec::async_scope emitters;
