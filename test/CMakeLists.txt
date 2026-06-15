@@ -15,6 +15,7 @@ add_executable(billet_tests
     test_profiles.cpp
     test_random_read_4k.cpp
     test_report.cpp
+    test_topology.cpp
     test_workload.cpp
 )
 

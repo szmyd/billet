@@ -63,12 +63,23 @@ runs without throwing percentile precision away.
 ## Current Engine Contract
 
 The sender engine is the only engine; the legacy callback path retired in
-Phase 4. Current constraints:
+Phase 4. Current behavior:
 
-- `--workers` must be `1`.
-- `--qd` is the global device-op cap enforced inside `workload_ctx`.
-- The single worker owns one `io_uring`, one aligned buffer pool, and one
-  sender scheduler, pinned to CPU 0.
+- `--workers N` runs N pinned worker threads (default 1). `--workers 0`
+  auto-sizes to one worker per NUMA-local hardware queue discovered on the
+  device. Each worker owns its own `io_uring`, aligned buffer pool, and sender
+  scheduler.
+- `--pin-strategy auto|mq|numa|linear|none` chooses how workers map to CPUs.
+  `mq` pins each worker to a distinct blk-mq hardware-queue cpuset (discovered
+  from `/sys/class/block/<disk>/mq/*/cpu_list`) so submission spreads across the
+  device's I/O queues; `auto` prefers `mq`, then `numa`, then `linear`. Run
+  `--probe <dev>` to print the discovered queue/cpuset/NUMA map.
+- `--qd` is the per-worker device-op cap enforced inside `workload_ctx`; the
+  aggregate inflight ceiling is `workers * qd`.
+- Read/write I/O fans out across workers, but WAL and commit stay one
+  serialized stream (a single physical WAL) hosted on worker 0: `postgresql`'s
+  WAL writer and checkpointer are never replicated, and `pg_wal_commit` (a pure
+  commit stream) always runs single-worker.
 
 `--metrics-port <N>` exposes a Prometheus `/metrics` endpoint; the
 docker-compose stack in [example/grafana/](example/grafana/) brings up

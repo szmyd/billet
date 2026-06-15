@@ -30,9 +30,13 @@ SISL_OPTION_GROUP(
     (device, "d", "device", "Block device to benchmark", ::cxxopts::value< std::string >(), "<path>"),
     (profile, "p", "profile", "Workload profile (random_read_4k | postgresql | pg_wal_commit)",
      ::cxxopts::value< std::string >()->default_value("random_read_4k"), "<name>"),
-    (workers, "w", "workers", "Number of pinned worker threads", ::cxxopts::value< uint32_t >()->default_value("1"),
-     ""),
-    (cpu, "", "cpu", "CPU the worker thread is pinned to", ::cxxopts::value< uint32_t >()->default_value("0"), ""),
+    (workers, "w", "workers",
+     "Number of pinned worker threads. 0 = auto: one per NUMA-local hardware queue (capped at online CPUs)",
+     ::cxxopts::value< uint32_t >()->default_value("1"), ""),
+    (pin_strategy, "", "pin-strategy",
+     "Worker CPU pinning: auto (mq->numa->linear) | mq (one cpuset per hardware queue) | numa | linear | none",
+     ::cxxopts::value< std::string >()->default_value("auto"), "<mode>"),
+    (cpu, "", "cpu", "Base CPU for the linear pin strategy", ::cxxopts::value< uint32_t >()->default_value("0"), ""),
     (duration, "t", "duration", "Run duration in seconds", ::cxxopts::value< uint32_t >()->default_value("30"), ""),
     (qd, "", "qd", "Queue depth per worker (closed-loop)", ::cxxopts::value< uint32_t >()->default_value("32"), ""),
     (allow_destructive, "", "allow-destructive",
@@ -109,6 +113,14 @@ std::span< billet::workload::component_spec const > profile_components(std::stri
     return {};
 }
 
+// Derive a per-worker RNG seed from a base. base == 0 stays 0 so each worker's
+// emitters seed independently from std::random_device (naturally divergent
+// streams); a non-zero base produces reproducible-yet-distinct per-worker
+// seeds via a SplitMix-style multiply.
+uint64_t derive_seed(uint64_t base, uint32_t worker_idx) {
+    return (0 == base) ? 0ULL : (base ^ (uint64_t{worker_idx} * 0x9E3779B97F4A7C15ULL));
+}
+
 void log_multiline(std::string const& s) {
     std::istringstream iss(s);
     std::string line;
@@ -159,6 +171,7 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         log_multiline(billet::engine::to_string(*result));
+        log_multiline(billet::engine::topology_to_string(billet::engine::discover_topology(result->path)));
         return 0;
     }
 
@@ -181,10 +194,40 @@ int main(int argc, char* argv[]) {
             return 2;
         }
 
-        uint32_t const worker_count = std::max< uint32_t >(1, SISL_OPTIONS["workers"].as< uint32_t >());
-        if (1 != worker_count) {
-            LOGERROR("billet currently runs single-worker only (got --workers={})", worker_count);
+        auto const& strat_name = SISL_OPTIONS["pin-strategy"].as< std::string >();
+        auto const strat_opt = billet::engine::parse_pin_strategy(strat_name);
+        if (!strat_opt) {
+            LOGERROR("unknown --pin-strategy '{}' (expected auto|mq|numa|linear|none)", strat_name);
             return 1;
+        }
+
+        // Discover the device's blk-mq + NUMA topology so each worker can be
+        // pinned to a distinct hardware-queue cpuset. Best-effort: synthetic or
+        // stacked devices (md, dm, loop) fall back to NUMA then linear placement.
+        auto const topo = billet::engine::discover_topology(dev->path);
+
+        // --workers 0 auto-sizes from the topology (one per NUMA-local queue).
+        uint32_t worker_count = SISL_OPTIONS["workers"].as< uint32_t >();
+        if (0 == worker_count) { worker_count = billet::engine::auto_worker_count(topo); }
+
+        // pg_wal_commit models one physical WAL: a single serialized commit
+        // stream that captures every session, never fanned out across workers.
+        if ("pg_wal_commit" == profile_name && 1 != worker_count) {
+            LOGWARN("pg_wal_commit models a single WAL commit stream; running 1 worker (requested {})", worker_count);
+            worker_count = 1;
+        }
+
+        auto const base_cpu = SISL_OPTIONS["cpu"].as< uint32_t >();
+        auto const placement = billet::engine::plan_workers(topo, worker_count, *strat_opt, base_cpu);
+        if (billet::engine::pin_strategy::mq == *strat_opt && billet::engine::pin_strategy::mq != placement.strategy) {
+            LOGWARN("--pin-strategy mq requested but {} exposes no blk-mq queues; using {}", topo.disk,
+                    billet::engine::pin_strategy_name(placement.strategy));
+        }
+        LOGINFO("workers:     {} (pin strategy: {})", worker_count,
+                billet::engine::pin_strategy_name(placement.strategy));
+        for (auto const& w : placement.workers) {
+            LOGINFO("  worker {}: cpus={}{}", w.worker_id, billet::engine::format_cpu_list(w.cpus),
+                    (0 <= w.queue_id) ? (" hwq=" + std::to_string(w.queue_id)) : std::string{});
         }
 
         billet::engine::run_config cfg{};
@@ -195,43 +238,58 @@ int main(int argc, char* argv[]) {
         // spec->destructive here keeps the engine's open mode at minimum
         // privilege: read-only profiles open O_RDONLY even after the gate
         // would have approved destructive use.
-        cfg.pin_cpu             = SISL_OPTIONS["cpu"].as< uint32_t >();
+        cfg.pin_cpu = SISL_OPTIONS["cpu"].as< uint32_t >();
         cfg.destructive_allowed = spec->destructive;
 
         auto const started_at = billet::report::iso8601_now();
 
         auto const components = profile_components(profile_name);
-        auto const run_id     = billet::report::make_ulid();
+        auto const run_id = billet::report::make_ulid();
 
-        std::function< exec::task< void >(billet::engine::workload_ctx&) > builder;
+        std::function< exec::task< void >(billet::engine::workload_ctx&, uint32_t, uint32_t) > builder;
         if ("random_read_4k" == profile_name) {
-            builder = [dev_size = dev->size_bytes,
-                       cfg_qd   = cfg.qd](billet::engine::workload_ctx& ctx) -> exec::task< void > {
+            builder = [dev_size = dev->size_bytes, cfg_qd = cfg.qd](
+                          billet::engine::workload_ctx& ctx, uint32_t worker_idx, uint32_t) -> exec::task< void > {
+                // Reads fan out: every worker drives independent 4K reads over
+                // the whole device with its own RNG stream.
                 co_await billet::workload::random_read_4k_run(ctx, dev_size, /*block_size=*/4096, cfg_qd,
-                                                              /*rng_seed=*/0);
+                                                              derive_seed(0, worker_idx));
             };
         } else if ("postgresql" == profile_name) {
             billet::workload::profiles::postgresql_config pg{};
-            pg.device_size_bytes  = dev->size_bytes;
-            pg.readers            = SISL_OPTIONS["pg-readers"].as< uint32_t >();
+            pg.device_size_bytes = dev->size_bytes;
+            pg.readers = SISL_OPTIONS["pg-readers"].as< uint32_t >();
             pg.reader_target_iops = SISL_OPTIONS["pg-reader-iops"].as< uint32_t >();
-            pg.writers            = SISL_OPTIONS["pg-writers"].as< uint32_t >();
+            pg.writers = SISL_OPTIONS["pg-writers"].as< uint32_t >();
             pg.writer_target_iops = SISL_OPTIONS["pg-writer-iops"].as< uint32_t >();
-            pg.wal_bytes_per_sec  = uint64_t(SISL_OPTIONS["pg-wal-mb-per-sec"].as< uint32_t >()) << 20;
+            pg.wal_bytes_per_sec = uint64_t(SISL_OPTIONS["pg-wal-mb-per-sec"].as< uint32_t >()) << 20;
             pg.wal_fsync_every_ms = SISL_OPTIONS["pg-wal-fsync-ms"].as< uint32_t >();
-            pg.ckpt_period_ms     = SISL_OPTIONS["pg-ckpt-period-ms"].as< uint32_t >();
-            pg.ckpt_burst_bytes   = uint64_t(SISL_OPTIONS["pg-ckpt-burst-mb"].as< uint32_t >()) << 20;
-            pg.hot_set_frac       = SISL_OPTIONS["pg-hot-set-frac"].as< double >();
-            pg.locality           = SISL_OPTIONS["pg-locality"].as< double >();
-            builder               = [pg, cfg_qd = cfg.qd](billet::engine::workload_ctx& ctx) -> exec::task< void > {
-                co_await billet::workload::profiles::postgresql_run(ctx, pg, cfg_qd);
+            pg.ckpt_period_ms = SISL_OPTIONS["pg-ckpt-period-ms"].as< uint32_t >();
+            pg.ckpt_burst_bytes = uint64_t(SISL_OPTIONS["pg-ckpt-burst-mb"].as< uint32_t >()) << 20;
+            pg.hot_set_frac = SISL_OPTIONS["pg-hot-set-frac"].as< double >();
+            pg.locality = SISL_OPTIONS["pg-locality"].as< double >();
+            builder = [pg, cfg_qd = cfg.qd](billet::engine::workload_ctx& ctx, uint32_t worker_idx,
+                                            uint32_t) -> exec::task< void > {
+                // Readers and random writers fan out across all workers; the WAL
+                // and checkpointer are singletons (one physical WAL stream, one
+                // checkpointer) hosted on worker 0 only, mirroring a single
+                // PostgreSQL instance. Non-zero workers drive data-file I/O only.
+                auto c = pg;
+                c.rng_seed = derive_seed(pg.rng_seed, worker_idx);
+                if (0 != worker_idx) {
+                    c.wal_bytes_per_sec = 0; // disables the WAL emitter
+                    c.ckpt_period_ms = 0;    // disables the checkpointer
+                }
+                co_await billet::workload::profiles::postgresql_run(ctx, c, cfg_qd);
             };
         } else if ("pg_wal_commit" == profile_name) {
             billet::workload::profiles::pg_wal_commit_config pgwc{};
-            pgwc.device_size_bytes       = dev->size_bytes;
-            pgwc.write_size_bytes        = SISL_OPTIONS["pgwc-write-size"].as< uint32_t >();
+            pgwc.device_size_bytes = dev->size_bytes;
+            pgwc.write_size_bytes = SISL_OPTIONS["pgwc-write-size"].as< uint32_t >();
             pgwc.region_per_session_bytes = uint64_t(SISL_OPTIONS["pgwc-region-mb"].as< uint32_t >()) << 20;
-            builder = [pgwc, cfg_qd = cfg.qd](billet::engine::workload_ctx& ctx) -> exec::task< void > {
+            builder = [pgwc, cfg_qd = cfg.qd](billet::engine::workload_ctx& ctx, uint32_t,
+                                              uint32_t) -> exec::task< void > {
+                // Single serialized WAL commit stream (worker_count forced to 1).
                 co_await billet::workload::profiles::pg_wal_commit_run(ctx, pgwc, cfg_qd);
             };
         } else {
@@ -250,8 +308,8 @@ int main(int argc, char* argv[]) {
         // sampler joins its thread before the group it samples
         // disappears, the server stops accepting connections, the
         // group deregisters from the farm.
-        std::unique_ptr< billet::stats::group >   metrics;
-        std::unique_ptr< billet::stats::server >  metrics_http;
+        std::unique_ptr< billet::stats::group > metrics;
+        std::unique_ptr< billet::stats::server > metrics_http;
         std::unique_ptr< billet::stats::sampler > metrics_sampler;
         if (auto const port = SISL_OPTIONS["metrics-port"].as< uint16_t >(); 0 < port) {
             // Prefix entity with --device-label when set so Grafana legends
@@ -259,19 +317,19 @@ int main(int argc, char* argv[]) {
             // ULID stays in the suffix so each run is still distinct and
             // sortable. Without a label the entity is the ULID alone --
             // current single-run dashboards keep working untouched.
-            auto const& dev_label   = SISL_OPTIONS["device-label"].as< std::string >();
-            auto const  metrics_id  = dev_label.empty() ? run_id : (dev_label + "." + run_id);
-            metrics                 = std::make_unique< billet::stats::group >(metrics_id, components);
-            metrics_http            = std::make_unique< billet::stats::server >(port);
-            metrics_sampler         = std::make_unique< billet::stats::sampler >(*metrics, live.inflight,
-                                                                                  std::chrono::milliseconds{500});
+            auto const& dev_label = SISL_OPTIONS["device-label"].as< std::string >();
+            auto const metrics_id = dev_label.empty() ? run_id : (dev_label + "." + run_id);
+            metrics = std::make_unique< billet::stats::group >(metrics_id, components);
+            metrics_http = std::make_unique< billet::stats::server >(port);
+            metrics_sampler =
+                std::make_unique< billet::stats::sampler >(*metrics, live.inflight, std::chrono::milliseconds{500});
             LOGINFO("metrics: /metrics on :{} (entity={})", port, metrics_id);
         }
 
         std::expected< billet::engine::run_summary, std::error_condition > sum;
         {
-            billet::cli::progress_reporter prog(live, cfg.duration, cfg.qd);
-            sum = billet::engine::run(*dev, cfg, components, &live, builder, metrics.get());
+            billet::cli::progress_reporter prog(live, cfg.duration, worker_count * cfg.qd);
+            sum = billet::engine::run(*dev, cfg, components, placement, &live, builder, metrics.get());
         }
         if (!sum) {
             LOGERROR("run failed: {}", sum.error().message());
@@ -286,8 +344,8 @@ int main(int argc, char* argv[]) {
 
             billet::report::run_record rec;
             rec.schema_version = "billet.run/1";
-            rec.run_id         = run_id;
-            rec.started_at     = started_at;
+            rec.run_id = run_id;
+            rec.started_at = started_at;
             rec.duration_s = secs;
             rec.host = billet::report::gather_host_info();
 
@@ -343,6 +401,7 @@ int main(int argc, char* argv[]) {
             rec.engine.qd_per_worker = cfg.qd;
             rec.engine.workers = sum->workers;
             rec.engine.pin_cpu = cfg.pin_cpu;
+            rec.engine.pin_strategy = billet::engine::pin_strategy_name(placement.strategy);
             rec.engine.sqpoll = false;
             rec.engine.o_direct = true;
 
@@ -375,8 +434,7 @@ int main(int argc, char* argv[]) {
                         if (cell >= sum->by_component_cell.size()) { break; }
                         auto const& d = sum->by_component_cell[cell];
                         if (0 < d.ops) {
-                            auto const key = std::string{spec.json_name} + "." +
-                                             billet::workload::op_kind_name(kind);
+                            auto const key = std::string{spec.json_name} + "." + billet::workload::op_kind_name(kind);
                             rec.results.by_component[key] =
                                 billet::report::op_stats_from_hdr(d.hdr.get(), d.ops, d.bytes);
                         }

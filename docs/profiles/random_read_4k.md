@@ -103,9 +103,12 @@ build/Release/src/cli/billet \
   --output rr.json
 ```
 
-Currently single-worker, so `--workers` must be `1`. Add `--metrics-port
-<N>` to expose Prometheus `/metrics`; the docker-compose stack in
-[example/grafana/](../../example/grafana/) brings up a live dashboard.
+`--workers N` runs N pinned workers, each driving its own `qd` closed-loop
+readers, so aggregate inflight is `N * qd`; `--workers 0` auto-sizes to one
+worker per NUMA-local hardware queue. `--pin-strategy auto|mq|numa|linear|none`
+controls placement (see `--probe <dev>` for the discovered queue map). Add
+`--metrics-port <N>` to expose Prometheus `/metrics`; the docker-compose stack
+in [example/grafana/](../../example/grafana/) brings up a live dashboard.
 
 ## What It Does Not Model
 
