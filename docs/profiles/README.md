@@ -49,11 +49,13 @@ Profiles:
 
 - [random_read_4k](random_read_4k.md)
 - [postgresql](postgresql.md)
+- [pg_wal_commit](pg_wal_commit.md)
 
 Workflow diagrams:
 
 - [random_read_4k workflow](random_read_4k.md#flow-diagram)
 - [postgresql workflow](postgresql.md#workflow-state-diagram)
+- [pg_wal_commit workflow](pg_wal_commit.md#flow-diagram)
 
 Adding a profile:
 
