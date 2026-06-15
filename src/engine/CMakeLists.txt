@@ -1,10 +1,13 @@
 cmake_minimum_required(VERSION 3.11)
 
+find_package(Threads REQUIRED)
+
 add_library(engine STATIC
     aligned_buf.cpp
     device_probe.cpp
     hdr.cpp
     log_summary.cpp
+    topology.cpp
 )
 
 target_include_directories(engine PUBLIC

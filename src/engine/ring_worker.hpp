@@ -19,7 +19,7 @@ struct run_config {
     std::chrono::seconds duration{30};
     uint32_t qd{32};                 // per-worker queue depth
     uint32_t pool_block_size{4096};  // per-slot preallocated buffer size
-    uint32_t pin_cpu{0};             // CPU the worker thread is pinned to
+    uint32_t pin_cpu{0};             // base CPU for the linear pin strategy; recorded in JSON
     bool destructive_allowed{false}; // gates O_RDWR and Write/Discard/Fsync/WriteZeroes
 };
 

@@ -140,14 +140,20 @@ Postgres-shaped by accident and matches the broader A/B goal.
 
 ### Multi-worker
 
-`--workers` is still effectively a single sender-engine path. Real NVMe
-devices can exceed one core's submission rate, so billet eventually needs
-multiple workers or multiple contexts feeding one run.
+Landed. `--workers N` fans out N pinned worker threads, each owning its own
+`io_uring`, sender scheduler, and aligned buffer pool, feeding the shared
+(URCU-sharded) metrics group and a merged `run_summary`. `--workers 0`
+auto-sizes to one worker per NUMA-local blk-mq hardware queue, discovered from
+sysfs (`engine/topology`). `--pin-strategy auto|mq|numa|linear|none` controls
+CPU placement; `mq` pins each worker to a distinct hardware-queue cpuset so
+submission spreads across the device's I/O queues instead of bottlenecking one
+core. Read/write I/O fans out across workers; WAL and commit stay a single
+serialized stream (one physical WAL) on worker 0.
 
-**Sequencing**: defer until stack-boundary observability exists. More billet
-workers would amplify tail numbers without explaining where the time went.
-Once the driver/backend can attribute stage latency, multi-worker becomes a
-high-value pressure tool instead of just a bigger headline generator.
+The original sequencing note (defer until stack-boundary observability exists)
+was relaxed: multi-worker landed first as a pressure tool. Stage attribution
+remains the next lever for explaining where multi-worker tails come from, and
+per-worker metric labels (below) are the immediate follow-up.
 
 ### Per-worker Metrics Labels
 
@@ -229,7 +235,7 @@ their own fetch block.
 | per-op correlation key | open, design/research |
 | stage-attribution schema in `billet.run/1` | open, design |
 | external stage report | open |
-| multi-worker | open, deferred until stack-boundary observability exists |
+| multi-worker | done (topology-aware cpuset pinning, WAL/commit single-stream) |
 | per-worker metrics labels | open, after multi-worker |
 | awaitable `cqe_state` | open |
 | driver/backend adoption of sisl encoding helpers | open |

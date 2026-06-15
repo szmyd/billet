@@ -158,9 +158,15 @@ build/Release/src/cli/billet \
   --output pg.json
 ```
 
-Currently single-worker, so `--workers` must be `1`. Add `--metrics-port
-<N>` to expose Prometheus `/metrics`; the docker-compose stack in
-[example/grafana/](../../example/grafana/) brings up a live dashboard.
+With `--workers N` the reader and random-writer emitters run on every worker,
+so the offered data-file load scales with `N`: `--workers 4 --pg-readers 4`
+offers 16 readers in aggregate. Increasing `--workers` means "offer more load,"
+not "spread a fixed load wider." The WAL and checkpointer stay a single stream
+on worker 0, so WAL/commit rates do not scale with `N`. To isolate submission
+parallelism at constant load instead, hold `--workers` fixed and vary
+`--pin-strategy`. Add `--metrics-port <N>` to expose Prometheus `/metrics`; the
+docker-compose stack in [example/grafana/](../../example/grafana/) brings up a
+live dashboard.
 
 ## Profile Shape
 

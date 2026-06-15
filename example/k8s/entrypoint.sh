@@ -12,7 +12,10 @@
 #   TARGET_PVC        PVC name that backs the block device, recorded for audit.
 #   OUTPUT_DIR        where billet writes JSON + the archive. Default /output.
 #   DURATION_S        per-profile duration. Default 120.
-#   QD                workload_ctx qd cap. Default 32.
+#   QD                per-worker workload_ctx qd cap. Default 32.
+#   WORKERS           pinned worker threads; 0 = one per NUMA-local hw queue. Default 1.
+#   PIN_STRATEGY      worker CPU pinning: auto|mq|numa|linear|none. Default numa
+#                     (device-local placement; stable across the matrix nodes).
 #   METRICS_PORT      Prometheus exposition port. Default 9777.
 #   METRICS_DRAIN_S   seconds /metrics stays up post-run for a final scrape. Default 30.
 #   JOB_NAME / POD_NAME / POD_NAMESPACE / NODE_NAME -- downward API; recorded for audit.
@@ -23,6 +26,8 @@ DEVICE_PATH="${DEVICE_PATH:-/dev/billet-target}"
 OUTPUT_DIR="${OUTPUT_DIR:-/output}"
 DURATION_S="${DURATION_S:-120}"
 QD="${QD:-32}"
+WORKERS="${WORKERS:-1}"
+PIN_STRATEGY="${PIN_STRATEGY:-numa}"
 METRICS_PORT="${METRICS_PORT:-9777}"
 METRICS_DRAIN_S="${METRICS_DRAIN_S:-30}"
 DEVICE_LABEL="${DEVICE_LABEL:-unlabeled}"
@@ -69,6 +74,8 @@ write_metadata() {
   "pvc_name": "${TARGET_PVC}",
   "duration_s": ${DURATION_S},
   "qd": ${QD},
+  "workers": ${WORKERS},
+  "pin_strategy": "${PIN_STRATEGY}",
   "metrics_port": ${METRICS_PORT},
   "metrics_drain_s": ${METRICS_DRAIN_S},
   "started_at": "${START_TS}",
@@ -91,7 +98,7 @@ billet \
     --device "$DEVICE_PATH" \
     --device-label "$DEVICE_LABEL" \
     --profile random_read_4k \
-    --workers 1 --qd "$QD" --duration "$DURATION_S" \
+    --workers "$WORKERS" --pin-strategy "$PIN_STRATEGY" --qd "$QD" --duration "$DURATION_S" \
     --metrics-port "$METRICS_PORT" \
     --metrics-drain-s "$METRICS_DRAIN_S" \
     --output "$OUTPUT_DIR/${DEVICE_LABEL}-rr4k.json"
@@ -102,7 +109,7 @@ billet \
     --device "$DEVICE_PATH" \
     --device-label "$DEVICE_LABEL" \
     --profile postgresql \
-    --workers 1 --qd "$QD" --duration "$DURATION_S" \
+    --workers "$WORKERS" --pin-strategy "$PIN_STRATEGY" --qd "$QD" --duration "$DURATION_S" \
     --metrics-port "$METRICS_PORT" \
     --metrics-drain-s "$METRICS_DRAIN_S" \
     --allow-destructive \

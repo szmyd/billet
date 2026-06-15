@@ -38,6 +38,7 @@ struct engine_info {
     uint32_t qd_per_worker{0};
     uint32_t workers{0};
     uint32_t pin_cpu{0};
+    std::string pin_strategy; // "mq" | "numa" | "linear" | "none"
     bool sqpoll{false};
     bool o_direct{true};
 };
@@ -68,7 +69,7 @@ struct op_stats {
 struct run_results {
     summary_stats summary;
     std::map< std::string, op_stats > by_op;
-    std::map< std::string, op_stats > by_phase; // legacy schema slot; not currently emitted
+    std::map< std::string, op_stats > by_phase;     // legacy schema slot; not currently emitted
     std::map< std::string, op_stats > by_component; // keys: "<component>.<OpKind>"
 };
 
